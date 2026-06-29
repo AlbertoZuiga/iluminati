@@ -29,6 +29,9 @@ Frontend:
 
 - React + Vite
 
+> En desarrollo, el frontend consume la API por `/api` usando proxy de Vite.
+> `VITE_API_URL` sigue apuntando al Web App de Google Apps Script.
+
 Backend (simple):
 
 - Google Apps Script
