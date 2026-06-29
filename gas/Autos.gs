@@ -22,3 +22,18 @@ function createAuto(params) {
 
   return { id: id, nombre: nombre, patente: patente, marca: marca, modelo: modelo, anio: anio, activo: true, createdAt: now }
 }
+
+function updateAuto(params) {
+  const id = params.id
+  if (!id) throw new Error("Se requiere un ID")
+
+  const updates = {}
+  if (params.nombre !== undefined) updates.nombre = String(params.nombre).trim()
+  if (params.patente !== undefined) updates.patente = String(params.patente).trim().toUpperCase()
+  if (params.marca !== undefined) updates.marca = String(params.marca).trim()
+  if (params.modelo !== undefined) updates.modelo = String(params.modelo).trim()
+  if (params.anio !== undefined && params.anio !== "") updates.anio = Number(params.anio)
+  if (params.activo !== undefined) updates.activo = params.activo === "true" || params.activo === true
+
+  return updateRow("Autos", id, updates)
+}

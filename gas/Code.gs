@@ -18,6 +18,8 @@ function doPost(e) {
 
     if (action === "createUsuario") return respond(createUsuario(params))
     if (action === "createAuto") return respond(createAuto(params))
+    if (action === "updateUsuario") return respond(updateUsuario(params))
+    if (action === "updateAuto") return respond(updateAuto(params))
     if (action === "deleteUsuario") return respond(softDelete("Usuarios", params.id))
     if (action === "deleteAuto") return respond(softDelete("Autos", params.id))
 

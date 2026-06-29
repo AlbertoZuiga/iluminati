@@ -35,6 +35,29 @@ function sheetToObjects(sheet) {
   return data.slice(1).map(function (row) { return rowToObject(headers, row) })
 }
 
+function updateRow(sheetName, id, updates) {
+  if (!id) throw new Error("Se requiere un ID")
+
+  const sheet = getSheet(sheetName)
+  const data = sheet.getDataRange().getValues()
+  const headers = data[0].map(function(h) { return String(h).trim().toLowerCase() })
+  const idCol = headers.indexOf("id")
+
+  if (idCol === -1) throw new Error("Columna 'id' no encontrada")
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === String(id)) {
+      Object.keys(updates).forEach(function(field) {
+        const col = headers.indexOf(field.toLowerCase())
+        if (col !== -1) sheet.getRange(i + 1, col + 1).setValue(updates[field])
+      })
+      return { id: id }
+    }
+  }
+
+  throw new Error("Registro no encontrado")
+}
+
 function softDelete(sheetName, id) {
   if (!id) throw new Error("Se requiere un ID")
 

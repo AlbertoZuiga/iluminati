@@ -14,3 +14,14 @@ function createUsuario(params) {
 
   return { id: id, nombre: nombre, activo: true, createdAt: now }
 }
+
+function updateUsuario(params) {
+  const id = params.id
+  if (!id) throw new Error("Se requiere un ID")
+
+  const updates = {}
+  if (params.nombre !== undefined) updates.nombre = String(params.nombre).trim()
+  if (params.activo !== undefined) updates.activo = params.activo === "true" || params.activo === true
+
+  return updateRow("Usuarios", id, updates)
+}
