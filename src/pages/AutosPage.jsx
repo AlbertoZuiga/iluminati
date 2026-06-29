@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { createAuto, getAutos } from "../services/api"
 import { normalizeCollection } from "../utils/normalizeCollection"
+import Modal from "../components/Modal"
 
 const INITIAL_FORM = { nombre: "", patente: "", marca: "", modelo: "", anio: "" }
 
@@ -11,6 +12,7 @@ export default function AutosPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     if (!success) return
@@ -21,7 +23,7 @@ export default function AutosPage() {
   useEffect(() => {
     let cancelled = false
 
-    async function loadAutos() {
+    async function load() {
       try {
         const data = await getAutos()
         if (cancelled) return
@@ -34,14 +36,11 @@ export default function AutosPage() {
       }
     }
 
-    loadAutos()
-
-    return () => {
-      cancelled = true
-    }
+    load()
+    return () => { cancelled = true }
   }, [])
 
-  async function refreshAutos() {
+  async function refresh() {
     setLoading(true)
     setError("")
     try {
@@ -54,24 +53,26 @@ export default function AutosPage() {
     }
   }
 
-  function handleChange(event) {
-    const { name, value } = event.target
+  function handleChange(e) {
+    const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  function handleClose() {
+    setModalOpen(false)
+    setForm(INITIAL_FORM)
+    setError("")
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
     setSaving(true)
     setError("")
-    setSuccess("")
     try {
-      await createAuto({
-        ...form,
-        anio: form.anio ? Number(form.anio) : undefined,
-      })
-      setForm(INITIAL_FORM)
+      await createAuto({ ...form, anio: form.anio ? Number(form.anio) : undefined })
+      handleClose()
       setSuccess("Auto creado correctamente.")
-      await refreshAutos()
+      await refresh()
     } catch (err) {
       setError(err.message || "No se pudo crear el auto")
     } finally {
@@ -80,121 +81,127 @@ export default function AutosPage() {
   }
 
   return (
-    <section className="page-grid">
-      <form className="card form-card" onSubmit={handleSubmit}>
-        <div className="card-header">
-          <h2>Crear auto</h2>
-          <p>Completa los datos básicos del vehículo.</p>
-        </div>
+    <section>
+      {success && (
+        <p className="feedback-banner feedback-success" aria-live="polite" style={{ marginBottom: 16 }}>
+          {success}
+        </p>
+      )}
 
-        {error && (
-          <p className="feedback-banner feedback-error" role="alert">{error}</p>
-        )}
-        {success && (
-          <p className="feedback-banner feedback-success" aria-live="polite">{success}</p>
-        )}
-
-        <label>
-          <span>Alias</span>
-          <input
-            type="text"
-            name="nombre"
-            value={form.nombre}
-            onChange={handleChange}
-            placeholder="Auto familiar"
-            required
-            autoComplete="off"
-          />
-        </label>
-
-        <label>
-          <span>Patente</span>
-          <input
-            type="text"
-            name="patente"
-            value={form.patente}
-            onChange={handleChange}
-            placeholder="ABCD12"
-            required
-            autoComplete="off"
-          />
-        </label>
-
-        <div className="split-fields">
-          <label>
-            <span>Marca</span>
-            <input
-              type="text"
-              name="marca"
-              value={form.marca}
-              onChange={handleChange}
-              placeholder="Toyota"
-              required
-              autoComplete="off"
-            />
-          </label>
-          <label>
-            <span>Modelo</span>
-            <input
-              type="text"
-              name="modelo"
-              value={form.modelo}
-              onChange={handleChange}
-              placeholder="Corolla"
-              required
-              autoComplete="off"
-            />
-          </label>
-        </div>
-
-        <label>
-          <span>Año <span className="field-optional">(opcional)</span></span>
-          <input
-            type="number"
-            name="anio"
-            min="1900"
-            max="2100"
-            value={form.anio}
-            onChange={handleChange}
-            placeholder="2024"
-          />
-        </label>
-
-        <button type="submit" disabled={saving}>
-          {saving ? "Guardando…" : "Crear auto"}
+      <div className="section-header">
+        <p className="section-count">
+          {loading ? "Cargando…" : `${autos.length} auto${autos.length !== 1 ? "s" : ""}`}
+        </p>
+        <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
+          + Crear auto
         </button>
-      </form>
+      </div>
 
-      <article className="card list-card">
-        <div className="card-header">
-          <h2>Autos registrados</h2>
-          <p>{loading ? "Cargando…" : `${autos.length} auto${autos.length !== 1 ? "s" : ""}`}</p>
+      {loading && (
+        <div className="skeleton-list">
+          <div className="skeleton" /><div className="skeleton" /><div className="skeleton" />
         </div>
+      )}
 
-        {loading && <div className="skeleton-list"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div>}
+      {!loading && autos.length === 0 && (
+        <p className="empty-state">Todavía no hay autos creados.</p>
+      )}
 
-        {!loading && autos.length === 0 && (
-          <p className="empty-state">Todavía no hay autos creados.</p>
-        )}
-
-        {!loading && autos.length > 0 && (
-          <ul className="data-list">
-            {autos.map((auto, i) => (
-              <li key={auto.id ?? `auto-${i}`}>
-                <div className="list-item-main">
-                  <strong>{auto.nombre ?? auto.patente ?? "Auto sin nombre"}</strong>
-                  <span className={`badge ${auto.activo ? "badge-active" : "badge-inactive"}`}>
-                    {auto.activo ? "Activo" : "Inactivo"}
-                  </span>
-                </div>
-                <span className="list-item-sub">
-                  {[auto.marca, auto.modelo, auto.patente, auto.anio].filter(Boolean).join(" · ")}
+      {!loading && autos.length > 0 && (
+        <ul className="data-list">
+          {autos.map((auto, i) => (
+            <li key={auto.id ?? `auto-${i}`}>
+              <div className="list-item-main">
+                <strong>{auto.nombre ?? auto.patente ?? "Auto sin nombre"}</strong>
+                <span className={`badge ${auto.activo ? "badge-active" : "badge-inactive"}`}>
+                  {auto.activo ? "Activo" : "Inactivo"}
                 </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </article>
+              </div>
+              <span className="list-item-sub">
+                {[auto.marca, auto.modelo, auto.patente, auto.anio].filter(Boolean).join(" · ")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Modal title="Crear auto" open={modalOpen} onClose={handleClose}>
+        <form className="form-card" onSubmit={handleSubmit}>
+          {error && (
+            <p className="feedback-banner feedback-error" role="alert">{error}</p>
+          )}
+
+          <label>
+            <span>Alias</span>
+            <input
+              type="text"
+              name="nombre"
+              value={form.nombre}
+              onChange={handleChange}
+              placeholder="Auto familiar"
+              required
+              autoComplete="off"
+            />
+          </label>
+
+          <label>
+            <span>Patente</span>
+            <input
+              type="text"
+              name="patente"
+              value={form.patente}
+              onChange={handleChange}
+              placeholder="ABCD12"
+              required
+              autoComplete="off"
+            />
+          </label>
+
+          <div className="split-fields">
+            <label>
+              <span>Marca</span>
+              <input
+                type="text"
+                name="marca"
+                value={form.marca}
+                onChange={handleChange}
+                placeholder="Toyota"
+                required
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              <span>Modelo</span>
+              <input
+                type="text"
+                name="modelo"
+                value={form.modelo}
+                onChange={handleChange}
+                placeholder="Corolla"
+                required
+                autoComplete="off"
+              />
+            </label>
+          </div>
+
+          <label>
+            <span>Año <span className="field-optional">(opcional)</span></span>
+            <input
+              type="number"
+              name="anio"
+              min="1900"
+              max="2100"
+              value={form.anio}
+              onChange={handleChange}
+              placeholder="2024"
+            />
+          </label>
+
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? "Guardando…" : "Crear auto"}
+          </button>
+        </form>
+      </Modal>
     </section>
   )
 }
