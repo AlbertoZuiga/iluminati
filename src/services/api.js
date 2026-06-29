@@ -86,6 +86,14 @@ export async function createUsuario(data) {
   return request("createUsuario", { method: "POST", body: data })
 }
 
+export async function updateAuto(id, data) {
+  return request("updateAuto", { method: "POST", body: { id, ...data } })
+}
+
+export async function updateUsuario(id, data) {
+  return request("updateUsuario", { method: "POST", body: { id, ...data } })
+}
+
 export async function deleteAuto(id) {
   return request("deleteAuto", { method: "POST", body: { id } })
 }
