@@ -70,37 +70,48 @@
   color: var(--text-h);
 }
 
-/* ── Two-column grid ── */
-.page-grid {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 20px;
-  align-items: start;
-}
-
-/* ── Cards ── */
-.card {
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--bg) 92%, var(--social-bg));
-  box-shadow: var(--shadow);
-}
-
-.card-header {
+/* ── Section header ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 20px;
 }
 
-.card-header h2 {
-  margin-bottom: 4px;
-}
-
-.card-header p {
-  font-size: 13px;
+.section-count {
+  font-size: 14px;
   color: var(--text);
+  margin: 0;
 }
 
-/* ── Form card ── */
+/* ── Buttons ── */
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Form ── */
 .form-card {
   display: grid;
   gap: 14px;
@@ -147,26 +158,6 @@
 
 .form-card button[type="submit"] {
   margin-top: 4px;
-  border: none;
-  border-radius: 10px;
-  padding: 11px 16px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s;
-}
-
-.form-card button[type="submit"]:hover:not(:disabled) {
-  opacity: 0.88;
-  transform: translateY(-1px);
-}
-
-.form-card button[type="submit"]:disabled {
-  cursor: wait;
-  opacity: 0.6;
 }
 
 .field-optional {
@@ -210,16 +201,70 @@
   }
 }
 
-/* ── List card ── */
-.list-card {
+/* ── Modal ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
-  flex-direction: column;
-  max-height: min(620px, 80vh);
-  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+  animation: modal-fade 0.15s ease;
 }
 
-.list-card .card-header {
-  flex-shrink: 0;
+.modal-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  animation: modal-slide 0.15s ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.modal-close:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+@keyframes modal-fade {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+
+@keyframes modal-slide {
+  from { opacity: 0; transform: translateY(8px) scale(0.98) }
+  to   { opacity: 1; transform: translateY(0) scale(1) }
 }
 
 /* ── Data list ── */
@@ -229,19 +274,6 @@
   padding: 0;
   display: grid;
   gap: 8px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.data-list::-webkit-scrollbar {
-  width: 4px;
-}
-.data-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-.data-list::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
 }
 
 .data-list li {
@@ -308,7 +340,7 @@
 /* ── Empty state ── */
 .empty-state {
   margin: 0;
-  padding: 32px 0;
+  padding: 48px 0;
   font-size: 14px;
   color: var(--text);
   text-align: center;
@@ -348,14 +380,6 @@
     padding: 0 16px;
   }
 
-  .page-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .list-card {
-    max-height: min(480px, 60vh);
-  }
-
   .split-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -364,5 +388,10 @@
 @media (max-width: 480px) {
   .split-fields {
     grid-template-columns: 1fr;
+  }
+
+  .modal-panel {
+    border-radius: 16px;
+    padding: 20px;
   }
 }
