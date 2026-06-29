@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { createUsuario, getUsuarios } from "../services/api"
+import { createUsuario, getUsuarios, updateUsuario } from "../services/api"
 import { normalizeCollection } from "../utils/normalizeCollection"
 import Modal from "../components/Modal"
 
@@ -13,6 +13,11 @@ export default function UsuariosPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
+  const [toggling, setToggling] = useState(new Set())
+  const [editTarget, setEditTarget] = useState(null)
+  const [editForm, setEditForm] = useState({ nombre: "" })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState("")
 
   useEffect(() => {
     if (!success) return
@@ -64,6 +69,57 @@ export default function UsuariosPage() {
     setError("")
   }
 
+  function handleOpenEdit(u) {
+    setEditTarget(u)
+    setEditForm({ nombre: u.nombre ?? "" })
+    setEditError("")
+  }
+
+  function handleCloseEdit() {
+    setEditTarget(null)
+    setEditForm({ nombre: "" })
+    setEditError("")
+  }
+
+  function handleEditChange(e) {
+    const { name, value } = e.target
+    setEditForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  async function handleEditSubmit(e) {
+    e.preventDefault()
+    setEditSaving(true)
+    setEditError("")
+    try {
+      await updateUsuario(editTarget.id, editForm)
+      setUsuarios((prev) =>
+        prev.map((x) => x.id === editTarget.id ? { ...x, ...editForm } : x)
+      )
+      handleCloseEdit()
+      setSuccess("Usuario actualizado.")
+    } catch (err) {
+      setEditError(err.message || "No se pudo actualizar el usuario")
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function handleToggleActivo(u) {
+    const id = u.id
+    if (toggling.has(id)) return
+    const nextActivo = !u.activo
+    setToggling((prev) => new Set([...prev, id]))
+    setUsuarios((prev) => prev.map((x) => x.id === id ? { ...x, activo: nextActivo } : x))
+    try {
+      await updateUsuario(id, { activo: nextActivo })
+    } catch (err) {
+      setUsuarios((prev) => prev.map((x) => x.id === id ? { ...x, activo: u.activo } : x))
+      setError(err.message || "No se pudo actualizar el usuario")
+    } finally {
+      setToggling((prev) => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
@@ -113,14 +169,41 @@ export default function UsuariosPage() {
             <li key={u.id ?? `u-${i}`}>
               <div className="list-item-main">
                 <strong>{u.nombre ?? "Usuario sin nombre"}</strong>
-                <span className={`badge ${u.activo ? "badge-active" : "badge-inactive"}`}>
-                  {u.activo ? "Activo" : "Inactivo"}
-                </span>
+                <button
+                  className={`badge badge-clickable ${u.activo ? "badge-active" : "badge-inactive"}`}
+                  onClick={() => handleToggleActivo(u)}
+                  disabled={toggling.has(u.id)}
+                  title={u.activo ? "Marcar inactivo" : "Marcar activo"}
+                >
+                  {toggling.has(u.id) ? "…" : u.activo ? "Activo" : "Inactivo"}
+                </button>
+                <button className="btn-icon" onClick={() => handleOpenEdit(u)} title="Editar" aria-label="Editar">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                  </svg>
+                </button>
               </div>
             </li>
           ))}
         </ul>
       )}
+
+      <Modal title="Editar usuario" open={editTarget !== null} onClose={handleCloseEdit}>
+        <form className="form-card" onSubmit={handleEditSubmit}>
+          {editError && (
+            <p className="feedback-banner feedback-error" role="alert">{editError}</p>
+          )}
+
+          <label>
+            <span>Nombre</span>
+            <input type="text" name="nombre" value={editForm.nombre} onChange={handleEditChange} required autoComplete="off" />
+          </label>
+
+          <button type="submit" className="btn btn-primary" disabled={editSaving}>
+            {editSaving ? "Guardando…" : "Guardar cambios"}
+          </button>
+        </form>
+      </Modal>
 
       <Modal title="Crear usuario" open={modalOpen} onClose={handleClose}>
         <form className="form-card" onSubmit={handleSubmit}>

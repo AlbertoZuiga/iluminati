@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { createAuto, getAutos } from "../services/api"
+import { createAuto, getAutos, updateAuto } from "../services/api"
 import { normalizeCollection } from "../utils/normalizeCollection"
 import Modal from "../components/Modal"
 
@@ -13,6 +13,11 @@ export default function AutosPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
+  const [toggling, setToggling] = useState(new Set())
+  const [editTarget, setEditTarget] = useState(null)
+  const [editForm, setEditForm] = useState(INITIAL_FORM)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState("")
 
   useEffect(() => {
     if (!success) return
@@ -64,6 +69,70 @@ export default function AutosPage() {
     setError("")
   }
 
+  function handleOpenEdit(auto) {
+    setEditTarget(auto)
+    setEditForm({
+      nombre: auto.nombre ?? "",
+      patente: auto.patente ?? "",
+      marca: auto.marca ?? "",
+      modelo: auto.modelo ?? "",
+      anio: auto.anio != null ? String(auto.anio) : "",
+    })
+    setEditError("")
+  }
+
+  function handleCloseEdit() {
+    setEditTarget(null)
+    setEditForm(INITIAL_FORM)
+    setEditError("")
+  }
+
+  function handleEditChange(e) {
+    const { name, value } = e.target
+    setEditForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  async function handleEditSubmit(e) {
+    e.preventDefault()
+    setEditSaving(true)
+    setEditError("")
+    try {
+      await updateAuto(editTarget.id, {
+        ...editForm,
+        anio: editForm.anio ? Number(editForm.anio) : undefined,
+      })
+      setAutos((prev) =>
+        prev.map((a) =>
+          a.id === editTarget.id
+            ? { ...a, ...editForm, anio: editForm.anio ? Number(editForm.anio) : a.anio }
+            : a
+        )
+      )
+      handleCloseEdit()
+      setSuccess("Auto actualizado.")
+    } catch (err) {
+      setEditError(err.message || "No se pudo actualizar el auto")
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function handleToggleActivo(auto) {
+    const id = auto.id
+    if (toggling.has(id)) return
+    const nextActivo = !auto.activo
+    setToggling((prev) => new Set([...prev, id]))
+    setAutos((prev) => prev.map((a) => a.id === id ? { ...a, activo: nextActivo } : a))
+    try {
+      await updateAuto(id, { activo: nextActivo })
+    } catch (err) {
+      setAutos((prev) => prev.map((a) => a.id === id ? { ...a, activo: auto.activo } : a))
+      setError(err.message || "No se pudo actualizar el auto")
+    } finally {
+      setToggling((prev) => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
@@ -113,9 +182,19 @@ export default function AutosPage() {
             <li key={auto.id ?? `auto-${i}`}>
               <div className="list-item-main">
                 <strong>{auto.nombre ?? auto.patente ?? "Auto sin nombre"}</strong>
-                <span className={`badge ${auto.activo ? "badge-active" : "badge-inactive"}`}>
-                  {auto.activo ? "Activo" : "Inactivo"}
-                </span>
+                <button
+                  className={`badge badge-clickable ${auto.activo ? "badge-active" : "badge-inactive"}`}
+                  onClick={() => handleToggleActivo(auto)}
+                  disabled={toggling.has(auto.id)}
+                  title={auto.activo ? "Marcar inactivo" : "Marcar activo"}
+                >
+                  {toggling.has(auto.id) ? "…" : auto.activo ? "Activo" : "Inactivo"}
+                </button>
+                <button className="btn-icon" onClick={() => handleOpenEdit(auto)} title="Editar" aria-label="Editar">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                  </svg>
+                </button>
               </div>
               <span className="list-item-sub">
                 {[auto.marca, auto.modelo, auto.patente, auto.anio].filter(Boolean).join(" · ")}
@@ -124,6 +203,44 @@ export default function AutosPage() {
           ))}
         </ul>
       )}
+
+      <Modal title="Editar auto" open={editTarget !== null} onClose={handleCloseEdit}>
+        <form className="form-card" onSubmit={handleEditSubmit}>
+          {editError && (
+            <p className="feedback-banner feedback-error" role="alert">{editError}</p>
+          )}
+
+          <label>
+            <span>Alias</span>
+            <input type="text" name="nombre" value={editForm.nombre} onChange={handleEditChange} required autoComplete="off" />
+          </label>
+
+          <label>
+            <span>Patente</span>
+            <input type="text" name="patente" value={editForm.patente} onChange={handleEditChange} required autoComplete="off" />
+          </label>
+
+          <div className="split-fields">
+            <label>
+              <span>Marca</span>
+              <input type="text" name="marca" value={editForm.marca} onChange={handleEditChange} required autoComplete="off" />
+            </label>
+            <label>
+              <span>Modelo</span>
+              <input type="text" name="modelo" value={editForm.modelo} onChange={handleEditChange} required autoComplete="off" />
+            </label>
+          </div>
+
+          <label>
+            <span>Año <span className="field-optional">(opcional)</span></span>
+            <input type="number" name="anio" min="1900" max="2100" value={editForm.anio} onChange={handleEditChange} />
+          </label>
+
+          <button type="submit" className="btn btn-primary" disabled={editSaving}>
+            {editSaving ? "Guardando…" : "Guardar cambios"}
+          </button>
+        </form>
+      </Modal>
 
       <Modal title="Crear auto" open={modalOpen} onClose={handleClose}>
         <form className="form-card" onSubmit={handleSubmit}>

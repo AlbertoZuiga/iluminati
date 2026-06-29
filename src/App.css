@@ -111,6 +111,20 @@
   color: #fff;
 }
 
+.btn-ghost {
+  background: none;
+  color: var(--text);
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--accent-bg);
+  color: var(--accent);
+  opacity: 1;
+  transform: none;
+}
+
 /* ── Form ── */
 .form-card {
   display: grid;
@@ -311,29 +325,99 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  gap: 5px;
+  padding: 3px 9px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+.badge::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
 .badge-active {
-  background: rgba(21, 128, 61, 0.1);
+  background: rgba(21, 128, 61, 0.08);
   color: #15803d;
+  border-color: rgba(21, 128, 61, 0.2);
+}
+
+.badge-active::before {
+  background: #15803d;
+  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.2);
 }
 
 .badge-inactive {
-  background: rgba(107, 99, 117, 0.1);
+  background: rgba(107, 99, 117, 0.07);
+  color: #6b6375;
+  border-color: rgba(107, 99, 117, 0.18);
+}
+
+.badge-inactive::before {
+  background: #9ca3af;
+}
+
+button.badge-clickable {
+  border-style: solid;
+  font: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s, filter 0.15s;
+}
+
+button.badge-clickable:hover {
+  filter: brightness(0.88);
+}
+
+button.badge-clickable:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+/* ── Edit icon button ── */
+.btn-icon {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
   color: var(--text);
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+  margin-left: auto;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+  background: rgba(107, 99, 117, 0.08);
+  border-color: rgba(107, 99, 117, 0.2);
 }
 
 @media (prefers-color-scheme: dark) {
   .badge-active {
-    background: rgba(74, 222, 128, 0.12);
+    background: rgba(74, 222, 128, 0.1);
     color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.25);
+  }
+
+  .badge-active::before {
+    background: #4ade80;
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+  }
+
+  .badge-inactive {
+    color: #9ca3af;
+    border-color: rgba(156, 163, 175, 0.2);
   }
 }
 
