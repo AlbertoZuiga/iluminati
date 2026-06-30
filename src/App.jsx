@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 import AutosPage from "./pages/AutosPage"
 import UsuariosPage from "./pages/UsuariosPage"
+import ViajesPage from "./pages/ViajesPage"
 import "./App.css"
 
 const routes = {
   "/autos": { label: "Autos" },
   "/usuarios": { label: "Usuarios" },
+  "/viajes": { label: "Viajes" },
 }
 
 function getRoute() {
@@ -50,12 +52,21 @@ function App() {
           >
             Usuarios
           </a>
+          <a
+            className={page === "/viajes" ? "active" : ""}
+            href="/viajes"
+            onClick={(e) => { e.preventDefault(); navigate("/viajes") }}
+          >
+            Viajes
+          </a>
         </nav>
       </header>
 
       <main className="page-main">
         <h1 className="page-title">{routes[page].label}</h1>
-        {page === "/autos" ? <AutosPage /> : <UsuariosPage />}
+        {page === "/autos" && <AutosPage />}
+        {page === "/usuarios" && <UsuariosPage />}
+        {page === "/viajes" && <ViajesPage />}
       </main>
     </div>
   )
