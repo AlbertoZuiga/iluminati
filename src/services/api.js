@@ -110,3 +110,30 @@ export async function deleteAuto(id) {
 export async function deleteUsuario(id) {
   return request("deleteUsuario", { method: "POST", body: { id } })
 }
+
+export async function getBootstrap() {
+  return request("bootstrap")
+}
+
+export async function getViajes() {
+  return request("viajes")
+}
+
+export async function createViaje(data) {
+  return request("createViaje", { method: "POST", body: data })
+}
+
+export async function updateViaje(id, data) {
+  return request("updateViaje", { method: "POST", body: { id, ...data } })
+}
+
+export async function getParticipantes() {
+  return request("participantes")
+}
+
+export async function saveParticipantes(viajeId, usuarioIds) {
+  return request("setParticipantes", {
+    method: "POST",
+    body: { viajeid: viajeId, usuarioids: usuarioIds.join(",") },
+  })
+}
