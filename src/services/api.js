@@ -38,13 +38,22 @@ async function request(action, options = {}) {
     requestOptions.body = toFormBody({ action, ...(options.body || {}) })
   }
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20000)
+  requestOptions.signal = controller.signal
+
   let response
   try {
     response = await fetch(url, requestOptions)
   } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("La API tardó demasiado en responder. Revisa la conexión o el despliegue.")
+    }
     throw new Error(`No se pudo conectar con la API. ${err.message || "Failed to fetch"}`, {
       cause: err,
     })
+  } finally {
+    clearTimeout(timeout)
   }
 
   if (!response.ok) {
