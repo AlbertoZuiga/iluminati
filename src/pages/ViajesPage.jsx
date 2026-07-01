@@ -4,14 +4,17 @@ import {
   getParticipantes, saveParticipantes,
 } from "../services/api"
 import { normalizeCollection } from "../utils/normalizeCollection"
+import { useCurrentUserId } from "../hooks/useCurrentUser"
 import Modal from "../components/Modal"
 
 const EMPTY_FORM = { auto: "", participantes: [], kminicio: "", kmfin: "" }
 
 export default function ViajesPage() {
+  const currentUserId = useCurrentUserId()
   const [viajes, setViajes] = useState([])
   const [autos, setAutos] = useState([])
   const [usuarios, setUsuarios] = useState([])
+  const [autoUsuarios, setAutoUsuarios] = useState([])
   const [participantes, setParticipantes] = useState([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [createStep, setCreateStep] = useState(1)
@@ -41,6 +44,7 @@ export default function ViajesPage() {
         setViajes(normalizeCollection(data?.viajes))
         setAutos(normalizeCollection(data?.autos).filter((a) => a.activo !== false))
         setUsuarios(normalizeCollection(data?.usuarios).filter((u) => u.activo !== false))
+        setAutoUsuarios(normalizeCollection(data?.autousuarios))
         setParticipantes(normalizeCollection(data?.participantes))
       } catch (err) {
         if (cancelled) return
@@ -80,6 +84,32 @@ export default function ViajesPage() {
     return map
   }, [participantes])
 
+  // autoid -> [usuarioid] (relación M:N auto↔usuario)
+  const miembrosByAuto = useMemo(() => {
+    const map = new Map()
+    for (const r of autoUsuarios) {
+      const list = map.get(r.autoid)
+      if (list) list.push(r.usuarioid)
+      else map.set(r.autoid, [r.usuarioid])
+    }
+    return map
+  }, [autoUsuarios])
+
+  // Autos visibles al crear: si hay usuario actual, solo los suyos
+  const autosVisibles = useMemo(() => {
+    if (!currentUserId) return autos
+    const mine = autos.filter((a) => (miembrosByAuto.get(a.id) ?? []).includes(currentUserId))
+    return mine.length > 0 ? mine : autos
+  }, [autos, currentUserId, miembrosByAuto])
+
+  // Usuarios disponibles como participantes: miembros del auto elegido (o todos)
+  function usuariosParaAuto(autoId) {
+    const ids = miembrosByAuto.get(autoId)
+    if (!ids || ids.length === 0) return usuarios
+    const set = new Set(ids)
+    return usuarios.filter((u) => set.has(u.id))
+  }
+
   function autoLabel(a) {
     return [a.nombre, a.patente].filter(Boolean).join(" · ")
   }
@@ -113,10 +143,12 @@ export default function ViajesPage() {
 
   function handleAutoSelect(autoId) {
     const lastKm = lastKmForAuto(autoId)
+    const allowed = new Set(usuariosParaAuto(autoId).map((u) => u.id))
     setForm((prev) => ({
       ...prev,
       auto: autoId,
       kminicio: lastKm != null ? String(lastKm) : prev.kminicio,
+      participantes: prev.participantes.filter((id) => allowed.has(id)),
     }))
   }
 
@@ -140,6 +172,20 @@ export default function ViajesPage() {
         ? prev.participantes.filter((id) => id !== userId)
         : [...prev.participantes, userId],
     }))
+  }
+
+  function handleOpenCreate() {
+    const preAuto = autosVisibles.length === 1 ? autosVisibles[0].id : ""
+    const preParticipantes = currentUserId ? [currentUserId] : []
+    setForm({
+      ...EMPTY_FORM,
+      auto: preAuto,
+      participantes: preParticipantes,
+      kminicio: preAuto ? (lastKmForAuto(preAuto) ?? "") + "" : "",
+    })
+    setCreateStep(1)
+    setError("")
+    setModalOpen(true)
   }
 
   function handleClose() {
@@ -245,13 +291,13 @@ export default function ViajesPage() {
     return null
   }
 
-  function AutoCards({ selected, onSelect }) {
-    if (autos.length === 0) {
+  function AutoCards({ selected, onSelect, options = autos }) {
+    if (options.length === 0) {
       return <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>No hay autos activos.</p>
     }
     return (
       <div className="auto-cards">
-        {autos.map((a) => (
+        {options.map((a) => (
           <button
             key={a.id}
             type="button"
@@ -278,7 +324,7 @@ export default function ViajesPage() {
         <p className="section-count">
           {loading ? "Cargando…" : `${viajes.length} viaje${viajes.length !== 1 ? "s" : ""}`}
         </p>
-        <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
+        <button className="btn btn-primary" onClick={handleOpenCreate}>
           + Registrar viaje
         </button>
       </div>
@@ -323,48 +369,17 @@ export default function ViajesPage() {
         </ul>
       )}
 
-      {/* Create — Step 1: Participantes */}
+      {/* Create — Step 1: Auto */}
       <Modal
-        title={createStep === 1 ? "Registrar viaje — Participantes" : "Registrar viaje — Detalles"}
+        title={createStep === 1 ? "Registrar viaje — Auto" : "Registrar viaje — Participantes"}
         open={modalOpen}
         onClose={handleClose}
       >
         {createStep === 1 ? (
           <div className="form-card">
-            {usuarios.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
-                No hay usuarios activos registrados.
-              </p>
-            ) : (
-              <ul className="participant-list">
-                {usuarios.map((u) => (
-                  <li key={u.id}>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={form.participantes.includes(u.id)}
-                        onChange={() => toggleParticipante(u.id)}
-                      />
-                      {u.nombre ?? u.email ?? u.id}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button className="btn btn-primary" onClick={() => setCreateStep(2)}>
-              Continuar →
-            </button>
-          </div>
-        ) : (
-          /* Create — Step 2: Auto + KM */
-          <form className="form-card" onSubmit={handleSubmit}>
-            {error && (
-              <p className="feedback-banner feedback-error" role="alert">{error}</p>
-            )}
-
             <div>
               <p className="auto-cards-label">Auto</p>
-              <AutoCards selected={form.auto} onSelect={handleAutoSelect} />
+              <AutoCards selected={form.auto} onSelect={handleAutoSelect} options={autosVisibles} />
             </div>
 
             <div className="split-fields">
@@ -392,6 +407,45 @@ export default function ViajesPage() {
                 />
               </label>
             </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={() => setCreateStep(2)}
+              disabled={!form.auto}
+            >
+              Continuar →
+            </button>
+          </div>
+        ) : (
+          /* Create — Step 2: Participantes */
+          <form className="form-card" onSubmit={handleSubmit}>
+            {error && (
+              <p className="feedback-banner feedback-error" role="alert">{error}</p>
+            )}
+
+            <p className="auto-cards-label" style={{ marginTop: 0 }}>
+              Participantes de {autoNombre(form.auto)}
+            </p>
+            {usuariosParaAuto(form.auto).length === 0 ? (
+              <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+                No hay usuarios activos registrados.
+              </p>
+            ) : (
+              <ul className="participant-list">
+                {usuariosParaAuto(form.auto).map((u) => (
+                  <li key={u.id}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={form.participantes.includes(u.id)}
+                        onChange={() => toggleParticipante(u.id)}
+                      />
+                      {u.nombre ?? u.email ?? u.id}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" className="btn btn-ghost" onClick={() => setCreateStep(1)}>
