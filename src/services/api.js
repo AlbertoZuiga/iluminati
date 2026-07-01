@@ -137,3 +137,14 @@ export async function saveParticipantes(viajeId, usuarioIds) {
     body: { viajeid: viajeId, usuarioids: usuarioIds.join(",") },
   })
 }
+
+export async function getAutoUsuarios() {
+  return request("autousuarios")
+}
+
+export async function saveAutoUsuarios(autoId, usuarioIds) {
+  return request("setAutoUsuarios", {
+    method: "POST",
+    body: { autoid: autoId, usuarioids: usuarioIds.join(",") },
+  })
+}
