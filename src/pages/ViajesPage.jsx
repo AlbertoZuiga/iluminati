@@ -5,6 +5,7 @@ import {
 } from "../services/api"
 import { normalizeCollection } from "../utils/normalizeCollection"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
+import { useAutosVisibles } from "../hooks/useAutosVisibles"
 import Modal from "../components/Modal"
 
 const EMPTY_FORM = { auto: "", participantes: [], kminicio: "", kmfin: "" }
@@ -84,30 +85,13 @@ export default function ViajesPage() {
     return map
   }, [participantes])
 
-  // autoid -> [usuarioid] (relación M:N auto↔usuario)
-  const miembrosByAuto = useMemo(() => {
-    const map = new Map()
-    for (const r of autoUsuarios) {
-      const list = map.get(r.autoid)
-      if (list) list.push(r.usuarioid)
-      else map.set(r.autoid, [r.usuarioid])
-    }
-    return map
-  }, [autoUsuarios])
-
-  // Autos visibles al crear: si hay usuario actual, solo los suyos
-  const autosVisibles = useMemo(() => {
-    if (!currentUserId) return autos
-    const mine = autos.filter((a) => (miembrosByAuto.get(a.id) ?? []).includes(currentUserId))
-    return mine.length > 0 ? mine : autos
-  }, [autos, currentUserId, miembrosByAuto])
+  const { autosVisibles, usuariosParaAuto: usuariosParaAutoBase } = useAutosVisibles(
+    autos, autoUsuarios, currentUserId
+  )
 
   // Usuarios disponibles como participantes: miembros del auto elegido (o todos)
   function usuariosParaAuto(autoId) {
-    const ids = miembrosByAuto.get(autoId)
-    if (!ids || ids.length === 0) return usuarios
-    const set = new Set(ids)
-    return usuarios.filter((u) => set.has(u.id))
+    return usuariosParaAutoBase(usuarios, autoId)
   }
 
   function autoLabel(a) {
