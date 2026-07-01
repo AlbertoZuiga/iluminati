@@ -35,6 +35,16 @@ function sheetToObjects(sheet) {
   return data.slice(1).map(function (row) { return rowToObject(headers, row) })
 }
 
+function appendRowByHeaders(sheetName, values) {
+  const sheet = getSheet(sheetName)
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (h) { return String(h).trim().toLowerCase() })
+  const row = headers.map(function (h) {
+    return Object.prototype.hasOwnProperty.call(values, h) ? values[h] : ""
+  })
+  sheet.appendRow(row)
+}
+
 function updateRow(sheetName, id, updates) {
   if (!id) throw new Error("Se requiere un ID")
 

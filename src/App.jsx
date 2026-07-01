@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import AutosPage from "./pages/AutosPage"
 import UsuariosPage from "./pages/UsuariosPage"
 import ViajesPage from "./pages/ViajesPage"
+import GastosPage from "./pages/GastosPage"
 import { getUsuarios } from "./services/api"
 import { normalizeCollection } from "./utils/normalizeCollection"
 import { useCurrentUserId, setCurrentUserId } from "./hooks/useCurrentUser"
@@ -12,6 +13,7 @@ const routes = {
   "/autos": { label: "Autos" },
   "/usuarios": { label: "Usuarios" },
   "/viajes": { label: "Viajes" },
+  "/gastos": { label: "Gastos" },
 }
 
 function getRoute() {
@@ -93,6 +95,13 @@ function App() {
           >
             Viajes
           </a>
+          <a
+            className={page === "/gastos" ? "active" : ""}
+            href="/gastos"
+            onClick={(e) => { e.preventDefault(); navigate("/gastos") }}
+          >
+            Gastos
+          </a>
         </nav>
 
         {currentUser ? (
@@ -117,6 +126,7 @@ function App() {
         {page === "/autos" && <AutosPage />}
         {page === "/usuarios" && <UsuariosPage />}
         {page === "/viajes" && <ViajesPage />}
+        {page === "/gastos" && <GastosPage />}
       </main>
 
       <UserSelectModal

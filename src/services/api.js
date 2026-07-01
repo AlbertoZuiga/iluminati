@@ -138,6 +138,18 @@ export async function saveParticipantes(viajeId, usuarioIds) {
   })
 }
 
+export async function getGastos() {
+  return request("gastos")
+}
+
+export async function createGasto(data) {
+  return request("createGasto", { method: "POST", body: data })
+}
+
+export async function updateGasto(id, data) {
+  return request("updateGasto", { method: "POST", body: { id, ...data } })
+}
+
 export async function getAutoUsuarios() {
   return request("autousuarios")
 }
