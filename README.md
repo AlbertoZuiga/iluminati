@@ -85,6 +85,18 @@ Se utilizan varias hojas:
 
 - relación entre viajes/gastos y usuarios
 
+### AutoUsuarios
+
+- relación muchos-a-muchos entre autos y usuarios
+- id
+- autoid
+- usuarioid
+
+> Define qué personas usan cada auto. Se gestiona al editar un auto (página Autos).
+> El "usuario actual" se selecciona en la barra superior y se persiste en `localStorage`.
+> Al registrar un viaje, filtra los autos a los del usuario (preselecciona si tiene uno solo)
+> y limita los participantes a los miembros de ese auto.
+
 ---
 
 ## 🧠 Concepto clave
