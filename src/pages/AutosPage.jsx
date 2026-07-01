@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react"
-import { createAuto, getAutos, updateAuto } from "../services/api"
+import {
+  createAuto, getAutos, updateAuto,
+  getUsuarios, getAutoUsuarios, saveAutoUsuarios,
+} from "../services/api"
 import { normalizeCollection } from "../utils/normalizeCollection"
 import Modal from "../components/Modal"
 
 const INITIAL_FORM = { nombre: "", patente: "", marca: "", modelo: "", anio: "" }
+const INITIAL_EDIT_FORM = { ...INITIAL_FORM, miembros: [] }
 
 export default function AutosPage() {
   const [autos, setAutos] = useState([])
+  const [usuarios, setUsuarios] = useState([])
+  const [autoUsuarios, setAutoUsuarios] = useState([])
   const [form, setForm] = useState(INITIAL_FORM)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -15,7 +21,7 @@ export default function AutosPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [toggling, setToggling] = useState(new Set())
   const [editTarget, setEditTarget] = useState(null)
-  const [editForm, setEditForm] = useState(INITIAL_FORM)
+  const [editForm, setEditForm] = useState(INITIAL_EDIT_FORM)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
 
@@ -30,9 +36,13 @@ export default function AutosPage() {
 
     async function load() {
       try {
-        const data = await getAutos()
+        const [autosData, usuariosData, autoUsuariosData] = await Promise.all([
+          getAutos(), getUsuarios(), getAutoUsuarios(),
+        ])
         if (cancelled) return
-        setAutos(normalizeCollection(data))
+        setAutos(normalizeCollection(autosData))
+        setUsuarios(normalizeCollection(usuariosData).filter((u) => u.activo !== false))
+        setAutoUsuarios(normalizeCollection(autoUsuariosData))
       } catch (err) {
         if (cancelled) return
         setError(err.message || "No se pudieron cargar los autos")
@@ -70,6 +80,9 @@ export default function AutosPage() {
   }
 
   function handleOpenEdit(auto) {
+    const miembros = autoUsuarios
+      .filter((r) => r.autoid === auto.id)
+      .map((r) => r.usuarioid)
     setEditTarget(auto)
     setEditForm({
       nombre: auto.nombre ?? "",
@@ -77,13 +90,14 @@ export default function AutosPage() {
       marca: auto.marca ?? "",
       modelo: auto.modelo ?? "",
       anio: auto.anio != null ? String(auto.anio) : "",
+      miembros,
     })
     setEditError("")
   }
 
   function handleCloseEdit() {
     setEditTarget(null)
-    setEditForm(INITIAL_FORM)
+    setEditForm(INITIAL_EDIT_FORM)
     setEditError("")
   }
 
@@ -92,22 +106,42 @@ export default function AutosPage() {
     setEditForm((prev) => ({ ...prev, [name]: value }))
   }
 
+  function toggleEditMiembro(userId) {
+    setEditForm((prev) => ({
+      ...prev,
+      miembros: prev.miembros.includes(userId)
+        ? prev.miembros.filter((id) => id !== userId)
+        : [...prev.miembros, userId],
+    }))
+  }
+
   async function handleEditSubmit(e) {
     e.preventDefault()
     setEditSaving(true)
     setEditError("")
     try {
+      const { miembros, ...autoFields } = editForm
       await updateAuto(editTarget.id, {
-        ...editForm,
+        ...autoFields,
         anio: editForm.anio ? Number(editForm.anio) : undefined,
       })
+      await saveAutoUsuarios(editTarget.id, miembros)
       setAutos((prev) =>
         prev.map((a) =>
           a.id === editTarget.id
-            ? { ...a, ...editForm, anio: editForm.anio ? Number(editForm.anio) : a.anio }
+            ? { ...a, ...autoFields, anio: editForm.anio ? Number(editForm.anio) : a.anio }
             : a
         )
       )
+      setAutoUsuarios((prev) => {
+        const kept = prev.filter((r) => r.autoid !== editTarget.id)
+        const added = miembros.map((uid) => ({
+          id: crypto.randomUUID(),
+          autoid: editTarget.id,
+          usuarioid: uid,
+        }))
+        return [...kept, ...added]
+      })
       handleCloseEdit()
       setSuccess("Auto actualizado.")
     } catch (err) {
@@ -235,6 +269,32 @@ export default function AutosPage() {
             <span>Año <span className="field-optional">(opcional)</span></span>
             <input type="number" name="anio" min="1900" max="2100" value={editForm.anio} onChange={handleEditChange} />
           </label>
+
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>
+              Miembros <span className="field-optional">(quiénes usan este auto)</span>
+            </p>
+            {usuarios.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+                No hay usuarios activos.
+              </p>
+            ) : (
+              <ul className="participant-list">
+                {usuarios.map((u) => (
+                  <li key={u.id}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={editForm.miembros.includes(u.id)}
+                        onChange={() => toggleEditMiembro(u.id)}
+                      />
+                      {u.nombre ?? u.email ?? u.id}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <button type="submit" className="btn btn-primary" disabled={editSaving}>
             {editSaving ? "Guardando…" : "Guardar cambios"}
