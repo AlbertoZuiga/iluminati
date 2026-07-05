@@ -149,7 +149,7 @@ export default function ViajesPage() {
     setForm((prev) => ({
       ...prev,
       auto: autoId,
-      kminicio: refKm != null ? String(refKm) : prev.kminicio,
+      kminicio: refKm != null ? String(refKm) : "",
       participantes: prev.participantes.filter((id) => allowed.has(id)),
     }))
   }
