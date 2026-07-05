@@ -61,7 +61,7 @@ export default function SaldosPage() {
         </button>
       </div>
 
-      <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>Balance por persona</p>
+      <p className="subsection-title">Balance por persona</p>
       {totales.length === 0 ? (
         <p className="empty-state">Sin movimientos en este periodo.</p>
       ) : (
@@ -82,7 +82,7 @@ export default function SaldosPage() {
         </ul>
       )}
 
-      <p style={{ margin: "24px 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>Quién paga a quién</p>
+      <p className="subsection-title" style={{ marginTop: 24 }}>Quién paga a quién</p>
       {transferencias.length === 0 ? (
         <p className="empty-state">{totales.length === 0 ? "Sin movimientos en este periodo." : "Todo saldado."}</p>
       ) : (
@@ -98,7 +98,7 @@ export default function SaldosPage() {
         </ul>
       )}
 
-      <p style={{ margin: "24px 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>Detalle por auto</p>
+      <p className="subsection-title" style={{ marginTop: 24 }}>Detalle por auto</p>
       {(data.autos || []).length === 0 ? (
         <p className="empty-state">Sin autos con movimientos.</p>
       ) : (

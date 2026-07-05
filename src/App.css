@@ -610,6 +610,14 @@ button.badge-clickable:disabled {
   flex-shrink: 0;
 }
 
+/* ── Subsection heading ── */
+.subsection-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
 /* ── Auto card selector ── */
 .auto-cards-label {
   margin: 0 0 8px;

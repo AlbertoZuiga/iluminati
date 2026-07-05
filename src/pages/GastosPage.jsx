@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
-import {
-  createGasto, getGastos, getBootstrap, updateGasto,
-} from "../services/api"
-import { normalizeCollection } from "../utils/normalizeCollection"
+import { createGasto, updateGasto } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
+import { useData } from "../context/DataContext"
 import Modal from "../components/Modal"
+import AutoCards from "../components/AutoCards"
+import EditButton from "../components/EditButton"
 
 const TIPOS = ["Bencina", "Peaje", "Mantención", "Seguro", "Otro"]
 
@@ -15,27 +15,6 @@ function today() {
 
 function emptyForm() {
   return { auto: "", fecha: today(), tipo: TIPOS[0], monto: "", pagadopor: "" }
-}
-
-function AutoCards({ selected, onSelect, options }) {
-  if (options.length === 0) {
-    return <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>No hay autos activos.</p>
-  }
-  return (
-    <div className="auto-cards">
-      {options.map((a) => (
-        <button
-          key={a.id}
-          type="button"
-          className={`auto-card${selected === a.id ? " selected" : ""}`}
-          onClick={() => onSelect(a.id)}
-        >
-          <span className="auto-card-name">{a.nombre}</span>
-          {a.patente && <span className="auto-card-patente">{a.patente}</span>}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 function GastoFields({ values, onChange, onSelectAuto, autoOptions, usuarios }) {
@@ -89,12 +68,17 @@ function GastoFields({ values, onChange, onSelectAuto, autoOptions, usuarios }) 
 
 export default function GastosPage() {
   const currentUserId = useCurrentUserId()
-  const [gastos, setGastos] = useState([])
-  const [autos, setAutos] = useState([])
-  const [usuarios, setUsuarios] = useState([])
-  const [autoUsuarios, setAutoUsuarios] = useState([])
+  const {
+    gastos, setGastos,
+    autos: autosRaw,
+    usuarios: usuariosRaw,
+    autoUsuarios,
+    loading,
+    reload,
+  } = useData()
+  const autos = useMemo(() => autosRaw.filter((a) => a.activo !== false), [autosRaw])
+  const usuarios = useMemo(() => usuariosRaw.filter((u) => u.activo !== false), [usuariosRaw])
   const [form, setForm] = useState(emptyForm)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -109,42 +93,6 @@ export default function GastosPage() {
     const t = setTimeout(() => setSuccess(""), 3000)
     return () => clearTimeout(t)
   }, [success])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      try {
-        const data = await getBootstrap()
-        if (cancelled) return
-        setGastos(normalizeCollection(data?.gastos))
-        setAutos(normalizeCollection(data?.autos).filter((a) => a.activo !== false))
-        setUsuarios(normalizeCollection(data?.usuarios).filter((u) => u.activo !== false))
-        setAutoUsuarios(normalizeCollection(data?.autousuarios))
-      } catch (err) {
-        if (cancelled) return
-        setError(err.message || "No se pudieron cargar los gastos")
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
-  }, [])
-
-  async function refresh() {
-    setLoading(true)
-    setError("")
-    try {
-      const data = await getGastos()
-      setGastos(normalizeCollection(data))
-    } catch (err) {
-      setError(err.message || "No se pudieron cargar los gastos")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const autosById = useMemo(() => new Map(autos.map((a) => [a.id, a])), [autos])
   const usuariosById = useMemo(() => new Map(usuarios.map((u) => [u.id, u])), [usuarios])
@@ -251,7 +199,7 @@ export default function GastosPage() {
     setSaving(true)
     setError("")
     try {
-      await createGasto({
+      const created = await createGasto({
         auto: form.auto,
         fecha: form.fecha,
         tipo: form.tipo,
@@ -260,7 +208,16 @@ export default function GastosPage() {
       })
       handleClose()
       setSuccess("Gasto registrado correctamente.")
-      await refresh()
+      setGastos((prev) => [...prev, {
+        id: created.id,
+        auto: created.auto,
+        fecha: created.fecha,
+        tipo: created.tipo,
+        monto: created.monto,
+        pagadopor: created.pagadopor,
+        createdat: created.createdat,
+      }])
+      reload()
     } catch (err) {
       setError(err.message || "No se pudo registrar el gasto")
     } finally {
@@ -339,11 +296,7 @@ export default function GastosPage() {
                 {formatMonto(gasto.monto) && (
                   <span className="badge badge-active">{formatMonto(gasto.monto)}</span>
                 )}
-                <button className="btn-icon" onClick={() => handleOpenEdit(gasto)} title="Editar" aria-label="Editar">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                  </svg>
-                </button>
+                <EditButton onClick={() => handleOpenEdit(gasto)} />
               </div>
               <span className="list-item-sub">
                 {[

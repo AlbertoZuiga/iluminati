@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import AutosPage from "./pages/AutosPage"
 import UsuariosPage from "./pages/UsuariosPage"
 import ViajesPage from "./pages/ViajesPage"
 import GastosPage from "./pages/GastosPage"
-import { getUsuarios } from "./services/api"
-import { normalizeCollection } from "./utils/normalizeCollection"
+import SaldosPage from "./pages/SaldosPage"
+import PeriodosPage from "./pages/PeriodosPage"
 import { useCurrentUserId, setCurrentUserId } from "./hooks/useCurrentUser"
+import { useData } from "./context/DataContext"
 import UserSelectModal from "./components/UserSelectModal"
 import "./App.css"
 
@@ -14,6 +15,8 @@ const routes = {
   "/usuarios": { label: "Usuarios" },
   "/viajes": { label: "Viajes" },
   "/gastos": { label: "Gastos" },
+  "/saldos": { label: "Saldos" },
+  "/periodos": { label: "Periodos" },
 }
 
 function getRoute() {
@@ -23,10 +26,11 @@ function getRoute() {
 
 function App() {
   const [page, setPage] = useState(getRoute)
-  const [usuarios, setUsuarios] = useState([])
   const [userModalOpen, setUserModalOpen] = useState(false)
   const currentUserId = useCurrentUserId()
-  const currentUser = usuarios.find((u) => u.id === currentUserId)
+  const { usuarios, loading, error, reload } = useData()
+  const usuariosActivos = useMemo(() => usuarios.filter((u) => u.activo !== false), [usuarios])
+  const currentUser = usuariosActivos.find((u) => u.id === currentUserId)
 
   useEffect(() => {
     if (!routes[window.location.pathname]) {
@@ -36,16 +40,6 @@ function App() {
     const handlePop = () => setPage(getRoute())
     window.addEventListener("popstate", handlePop)
     return () => window.removeEventListener("popstate", handlePop)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    getUsuarios()
-      .then((data) => {
-        if (!cancelled) setUsuarios(normalizeCollection(data).filter((u) => u.activo !== false))
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -109,12 +103,17 @@ function App() {
         {page === "/usuarios" && <UsuariosPage />}
         {page === "/viajes" && <ViajesPage />}
         {page === "/gastos" && <GastosPage />}
+        {page === "/saldos" && <SaldosPage />}
+        {page === "/periodos" && <PeriodosPage />}
       </main>
 
       <UserSelectModal
         open={userModalOpen}
         forced={!currentUserId}
-        usuarios={usuarios}
+        usuarios={usuariosActivos}
+        loading={loading}
+        error={error}
+        onRetry={reload}
         onSelect={handleSelectUser}
         onClose={() => setUserModalOpen(false)}
       />

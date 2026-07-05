@@ -1,24 +1,28 @@
 import { useEffect, useMemo, useState } from "react"
-import {
-  createViaje, getViajes, getBootstrap, updateViaje,
-  getParticipantes, saveParticipantes,
-} from "../services/api"
-import { normalizeCollection } from "../utils/normalizeCollection"
+import { createViaje, updateViaje, saveParticipantes } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
+import { useData } from "../context/DataContext"
 import Modal from "../components/Modal"
+import AutoCards from "../components/AutoCards"
+import EditButton from "../components/EditButton"
 
 const EMPTY_FORM = { auto: "", participantes: [], kminicio: "", kmfin: "" }
 
 export default function ViajesPage() {
   const currentUserId = useCurrentUserId()
-  const [viajes, setViajes] = useState([])
-  const [autos, setAutos] = useState([])
-  const [usuarios, setUsuarios] = useState([])
-  const [autoUsuarios, setAutoUsuarios] = useState([])
-  const [participantes, setParticipantes] = useState([])
+  const {
+    viajes, setViajes,
+    autos: autosRaw,
+    usuarios: usuariosRaw,
+    autoUsuarios,
+    participantes, setParticipantes,
+    loading,
+    reload,
+  } = useData()
+  const autos = useMemo(() => autosRaw.filter((a) => a.activo !== false), [autosRaw])
+  const usuarios = useMemo(() => usuariosRaw.filter((u) => u.activo !== false), [usuariosRaw])
   const [form, setForm] = useState(EMPTY_FORM)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -34,44 +38,6 @@ export default function ViajesPage() {
     const t = setTimeout(() => setSuccess(""), 3000)
     return () => clearTimeout(t)
   }, [success])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      try {
-        const data = await getBootstrap()
-        if (cancelled) return
-        setViajes(normalizeCollection(data?.viajes))
-        setAutos(normalizeCollection(data?.autos).filter((a) => a.activo !== false))
-        setUsuarios(normalizeCollection(data?.usuarios).filter((u) => u.activo !== false))
-        setAutoUsuarios(normalizeCollection(data?.autousuarios))
-        setParticipantes(normalizeCollection(data?.participantes))
-      } catch (err) {
-        if (cancelled) return
-        setError(err.message || "No se pudieron cargar los viajes")
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
-  }, [])
-
-  async function refresh() {
-    setLoading(true)
-    setError("")
-    try {
-      const [viajesData, participantesData] = await Promise.all([getViajes(), getParticipantes()])
-      setViajes(normalizeCollection(viajesData))
-      setParticipantes(normalizeCollection(participantesData))
-    } catch (err) {
-      setError(err.message || "No se pudieron cargar los viajes")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const autosById = useMemo(() => new Map(autos.map((a) => [a.id, a])), [autos])
   const usuariosById = useMemo(() => new Map(usuarios.map((u) => [u.id, u])), [usuarios])
@@ -328,7 +294,7 @@ export default function ViajesPage() {
     }
     setSaving(true)
     try {
-      await createViaje({
+      const created = await createViaje({
         auto: form.auto,
         kminicio: form.kminicio ? Number(form.kminicio) : undefined,
         kmfin: form.kmfin ? Number(form.kmfin) : undefined,
@@ -336,7 +302,22 @@ export default function ViajesPage() {
       })
       handleClose()
       setSuccess("Viaje registrado correctamente.")
-      await refresh()
+      setViajes((prev) => [...prev, {
+        id: created.id,
+        auto: created.auto,
+        kminicio: created.kminicio,
+        kmfin: created.kmfin,
+        createdat: created.createdat,
+      }])
+      setParticipantes((prev) => [
+        ...prev,
+        ...(created.participantes ?? []).map((usuarioid) => ({
+          id: crypto.randomUUID(),
+          viajeid: created.id,
+          usuarioid,
+        })),
+      ])
+      reload()
     } catch (err) {
       setError(err.message || "No se pudo registrar el viaje")
     } finally {
@@ -349,27 +330,6 @@ export default function ViajesPage() {
       return `${viaje.kmfin - viaje.kminicio} km`
     }
     return null
-  }
-
-  function AutoCards({ selected, onSelect, options = autos }) {
-    if (options.length === 0) {
-      return <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>No hay autos activos.</p>
-    }
-    return (
-      <div className="auto-cards">
-        {options.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className={`auto-card${selected === a.id ? " selected" : ""}`}
-            onClick={() => onSelect(a.id)}
-          >
-            <span className="auto-card-name">{a.nombre}</span>
-            {a.patente && <span className="auto-card-patente">{a.patente}</span>}
-          </button>
-        ))}
-      </div>
-    )
   }
 
   const formRefKm = form.auto ? referenceKmForAuto(form.auto) : null
@@ -454,11 +414,7 @@ export default function ViajesPage() {
                   {kmRecorridos(viaje) && (
                     <span className="badge badge-active">{kmRecorridos(viaje)}</span>
                   )}
-                  <button className="btn-icon" onClick={() => handleOpenEdit(viaje)} title="Editar" aria-label="Editar">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                    </svg>
-                  </button>
+                  <EditButton onClick={() => handleOpenEdit(viaje)} />
                 </div>
                 <span className="list-item-sub">
                   {[
@@ -570,11 +526,11 @@ export default function ViajesPage() {
 
           <div>
             <p className="auto-cards-label">Auto</p>
-            <AutoCards selected={editForm.auto} onSelect={handleEditAutoSelect} />
+            <AutoCards selected={editForm.auto} onSelect={handleEditAutoSelect} options={autos} />
           </div>
 
           <div>
-            <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>
+            <p className="subsection-title">
               Participantes
             </p>
             <ul className="participant-list">

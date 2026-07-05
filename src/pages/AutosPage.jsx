@@ -1,10 +1,8 @@
-import { useEffect, useState } from "react"
-import {
-  createAuto, getAutos, updateAuto,
-  getUsuarios, getAutoUsuarios, saveAutoUsuarios,
-} from "../services/api"
-import { normalizeCollection } from "../utils/normalizeCollection"
+import { useEffect, useMemo, useState } from "react"
+import { createAuto, updateAuto, saveAutoUsuarios } from "../services/api"
+import { useData } from "../context/DataContext"
 import Modal from "../components/Modal"
+import EditButton from "../components/EditButton"
 
 const INITIAL_FORM = { nombre: "", patente: "", marca: "", modelo: "", anio: "", tienebono: false, kmactual: "" }
 const INITIAL_EDIT_FORM = { ...INITIAL_FORM, miembros: [] }
@@ -18,11 +16,15 @@ function nuevoMiembro(usuarioid) {
 }
 
 export default function AutosPage() {
-  const [autos, setAutos] = useState([])
-  const [usuarios, setUsuarios] = useState([])
-  const [autoUsuarios, setAutoUsuarios] = useState([])
+  const {
+    autos, setAutos,
+    usuarios: usuariosRaw,
+    autoUsuarios, setAutoUsuarios,
+    loading,
+    reload,
+  } = useData()
+  const usuarios = useMemo(() => usuariosRaw.filter((u) => u.activo !== false), [usuariosRaw])
   const [form, setForm] = useState(INITIAL_FORM)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -38,43 +40,6 @@ export default function AutosPage() {
     const timer = setTimeout(() => setSuccess(""), 3000)
     return () => clearTimeout(timer)
   }, [success])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      try {
-        const [autosData, usuariosData, autoUsuariosData] = await Promise.all([
-          getAutos(), getUsuarios(), getAutoUsuarios(),
-        ])
-        if (cancelled) return
-        setAutos(normalizeCollection(autosData))
-        setUsuarios(normalizeCollection(usuariosData).filter((u) => u.activo !== false))
-        setAutoUsuarios(normalizeCollection(autoUsuariosData))
-      } catch (err) {
-        if (cancelled) return
-        setError(err.message || "No se pudieron cargar los autos")
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
-  }, [])
-
-  async function refresh() {
-    setLoading(true)
-    setError("")
-    try {
-      const data = await getAutos()
-      setAutos(normalizeCollection(data))
-    } catch (err) {
-      setError(err.message || "No se pudieron cargar los autos")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -205,14 +170,15 @@ export default function AutosPage() {
     setSaving(true)
     setError("")
     try {
-      await createAuto({
+      const created = await createAuto({
         ...form,
         anio: form.anio ? Number(form.anio) : undefined,
         kmactual: form.kmactual ? Number(form.kmactual) : undefined,
       })
       handleClose()
       setSuccess("Auto creado correctamente.")
-      await refresh()
+      setAutos((prev) => [...prev, created])
+      reload()
     } catch (err) {
       setError(err.message || "No se pudo crear el auto")
     } finally {
@@ -261,11 +227,7 @@ export default function AutosPage() {
                 >
                   {toggling.has(auto.id) ? "…" : auto.activo ? "Activo" : "Inactivo"}
                 </button>
-                <button className="btn-icon" onClick={() => handleOpenEdit(auto)} title="Editar" aria-label="Editar">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                  </svg>
-                </button>
+                <EditButton onClick={() => handleOpenEdit(auto)} />
               </div>
               <span className="list-item-sub">
                 {[
@@ -328,7 +290,7 @@ export default function AutosPage() {
           </div>
 
           <div>
-            <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>
+            <p className="subsection-title">
               Miembros <span className="field-optional">(quiénes usan este auto)</span>
             </p>
             {usuarios.length === 0 ? (

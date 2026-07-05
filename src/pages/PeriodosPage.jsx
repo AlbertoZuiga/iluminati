@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import { getPeriodos, createPeriodo, updatePeriodo, cerrarPeriodo } from "../services/api"
-import { normalizeCollection } from "../utils/normalizeCollection"
+import { createPeriodo, updatePeriodo, cerrarPeriodo } from "../services/api"
+import { useData } from "../context/DataContext"
 import Modal from "../components/Modal"
+import EditButton from "../components/EditButton"
 
 function fmtFecha(v) {
   if (!v) return "—"
@@ -19,9 +20,8 @@ function toDateInput(v) {
 }
 
 export default function PeriodosPage() {
-  const [periodos, setPeriodos] = useState([])
+  const { periodos, loading, reload } = useData()
   const [nombre, setNombre] = useState("")
-  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -37,25 +37,11 @@ export default function PeriodosPage() {
     return () => clearTimeout(t)
   }, [success])
 
-  useEffect(() => {
-    let cancelled = false
-    getPeriodos()
-      .then((data) => { if (!cancelled) setPeriodos(normalizeCollection(data)) })
-      .catch((err) => { if (!cancelled) setError(err.message || "No se pudieron cargar los periodos") })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [])
-
   const abierto = useMemo(() => periodos.find((p) => !p.fechafin) || null, [periodos])
   const cerrados = useMemo(
     () => periodos.filter((p) => p.fechafin).sort((a, b) => new Date(b.fechainicio) - new Date(a.fechainicio)),
     [periodos]
   )
-
-  async function reload() {
-    const data = await getPeriodos()
-    setPeriodos(normalizeCollection(data))
-  }
 
   async function handleAbrir(e) {
     e.preventDefault()
@@ -157,16 +143,12 @@ export default function PeriodosPage() {
       ) : (
         <>
           <div className="form-card" style={{ marginBottom: 20 }}>
-            <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>Periodo actual</p>
+            <p className="subsection-title">Periodo actual</p>
             {abierto ? (
               <>
                 <p style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: 8 }}>
                   <strong>{abierto.nombre || "Sin nombre"}</strong>
-                  <button className="btn-icon" onClick={() => handleOpenEdit(abierto)} title="Editar" aria-label="Editar">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                    </svg>
-                  </button>
+                  <EditButton onClick={() => handleOpenEdit(abierto)} />
                 </p>
                 <p className="list-item-sub" style={{ margin: "0 0 12px" }}>
                   Desde {fmtFecha(abierto.fechainicio)} · <span className="badge badge-active">Abierto</span>
@@ -199,11 +181,7 @@ export default function PeriodosPage() {
                   <div className="list-item-main">
                     <strong>{p.nombre || "Sin nombre"}</strong>
                     <span className="badge badge-inactive">Cerrado</span>
-                    <button className="btn-icon" onClick={() => handleOpenEdit(p)} title="Editar" aria-label="Editar">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                      </svg>
-                    </button>
+                    <EditButton onClick={() => handleOpenEdit(p)} />
                   </div>
                   <span className="list-item-sub">{fmtFecha(p.fechainicio)} — {fmtFecha(p.fechafin)}</span>
                 </li>

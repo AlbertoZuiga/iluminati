@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react"
-import { createUsuario, getUsuarios, updateUsuario } from "../services/api"
-import { normalizeCollection } from "../utils/normalizeCollection"
+import { createUsuario, updateUsuario } from "../services/api"
+import { useData } from "../context/DataContext"
 import Modal from "../components/Modal"
+import EditButton from "../components/EditButton"
 
 const INITIAL_FORM = { nombre: "" }
 
 export default function UsuariosPage() {
-  const [usuarios, setUsuarios] = useState([])
+  const { usuarios, setUsuarios, loading, reload } = useData()
   const [form, setForm] = useState(INITIAL_FORM)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -24,39 +24,6 @@ export default function UsuariosPage() {
     const timer = setTimeout(() => setSuccess(""), 3000)
     return () => clearTimeout(timer)
   }, [success])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      try {
-        const data = await getUsuarios()
-        if (cancelled) return
-        setUsuarios(normalizeCollection(data))
-      } catch (err) {
-        if (cancelled) return
-        setError(err.message || "No se pudieron cargar los usuarios")
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
-  }, [])
-
-  async function refresh() {
-    setLoading(true)
-    setError("")
-    try {
-      const data = await getUsuarios()
-      setUsuarios(normalizeCollection(data))
-    } catch (err) {
-      setError(err.message || "No se pudieron cargar los usuarios")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -125,10 +92,11 @@ export default function UsuariosPage() {
     setSaving(true)
     setError("")
     try {
-      await createUsuario(form)
+      const created = await createUsuario(form)
       handleClose()
       setSuccess("Usuario creado correctamente.")
-      await refresh()
+      setUsuarios((prev) => [...prev, created])
+      reload()
     } catch (err) {
       setError(err.message || "No se pudo crear el usuario")
     } finally {
@@ -177,11 +145,7 @@ export default function UsuariosPage() {
                 >
                   {toggling.has(u.id) ? "…" : u.activo ? "Activo" : "Inactivo"}
                 </button>
-                <button className="btn-icon" onClick={() => handleOpenEdit(u)} title="Editar" aria-label="Editar">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                  </svg>
-                </button>
+                <EditButton onClick={() => handleOpenEdit(u)} />
               </div>
             </li>
           ))}
