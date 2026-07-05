@@ -154,9 +154,30 @@ export async function getAutoUsuarios() {
   return request("autousuarios")
 }
 
-export async function saveAutoUsuarios(autoId, usuarioIds) {
+// miembros: [{ usuarioid, rol, dividegastos, recibebono, pagaestanque }]
+export async function saveAutoUsuarios(autoId, miembros) {
   return request("setAutoUsuarios", {
     method: "POST",
-    body: { autoid: autoId, usuarioids: usuarioIds.join(",") },
+    body: { autoid: autoId, miembros: JSON.stringify(miembros) },
   })
+}
+
+export async function getPeriodos() {
+  return request("periodos")
+}
+
+export async function createPeriodo(data = {}) {
+  return request("createPeriodo", { method: "POST", body: data })
+}
+
+export async function updatePeriodo(id, data) {
+  return request("updatePeriodo", { method: "POST", body: { id, ...data } })
+}
+
+export async function cerrarPeriodo(data = {}) {
+  return request("cerrarPeriodo", { method: "POST", body: data })
+}
+
+export async function getSaldos() {
+  return request("saldos")
 }

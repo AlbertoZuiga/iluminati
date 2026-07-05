@@ -74,34 +74,16 @@ function App() {
           Iluminati
         </span>
         <nav className="page-nav" aria-label="Secciones">
-          <a
-            className={page === "/autos" ? "active" : ""}
-            href="/autos"
-            onClick={(e) => { e.preventDefault(); navigate("/autos") }}
-          >
-            Autos
-          </a>
-          <a
-            className={page === "/usuarios" ? "active" : ""}
-            href="/usuarios"
-            onClick={(e) => { e.preventDefault(); navigate("/usuarios") }}
-          >
-            Usuarios
-          </a>
-          <a
-            className={page === "/viajes" ? "active" : ""}
-            href="/viajes"
-            onClick={(e) => { e.preventDefault(); navigate("/viajes") }}
-          >
-            Viajes
-          </a>
-          <a
-            className={page === "/gastos" ? "active" : ""}
-            href="/gastos"
-            onClick={(e) => { e.preventDefault(); navigate("/gastos") }}
-          >
-            Gastos
-          </a>
+          {Object.entries(routes).map(([path, { label }]) => (
+            <a
+              key={path}
+              className={page === path ? "active" : ""}
+              href={path}
+              onClick={(e) => { e.preventDefault(); navigate(path) }}
+            >
+              {label}
+            </a>
+          ))}
         </nav>
 
         {currentUser ? (
@@ -111,7 +93,7 @@ function App() {
             </span>
             <span className="user-session-name">{currentUser.nombre ?? currentUser.email ?? currentUser.id}</span>
             <button type="button" className="btn-ghost" onClick={handleLogout}>
-              Cerrar sesión
+              Cambiar usuario
             </button>
           </div>
         ) : (

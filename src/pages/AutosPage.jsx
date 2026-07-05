@@ -6,8 +6,16 @@ import {
 import { normalizeCollection } from "../utils/normalizeCollection"
 import Modal from "../components/Modal"
 
-const INITIAL_FORM = { nombre: "", patente: "", marca: "", modelo: "", anio: "" }
+const INITIAL_FORM = { nombre: "", patente: "", marca: "", modelo: "", anio: "", tienebono: false, kmactual: "" }
 const INITIAL_EDIT_FORM = { ...INITIAL_FORM, miembros: [] }
+
+function toBool(v) {
+  return v === true || v === "true" || v === 1 || v === "1"
+}
+
+function nuevoMiembro(usuarioid) {
+  return { usuarioid, dividegastos: true, recibebono: false, pagaestanque: false }
+}
 
 export default function AutosPage() {
   const [autos, setAutos] = useState([])
@@ -82,7 +90,12 @@ export default function AutosPage() {
   function handleOpenEdit(auto) {
     const miembros = autoUsuarios
       .filter((r) => r.autoid === auto.id)
-      .map((r) => r.usuarioid)
+      .map((r) => ({
+        usuarioid: r.usuarioid,
+        dividegastos: toBool(r.dividegastos),
+        recibebono: toBool(r.recibebono),
+        pagaestanque: toBool(r.pagaestanque),
+      }))
     setEditTarget(auto)
     setEditForm({
       nombre: auto.nombre ?? "",
@@ -90,6 +103,8 @@ export default function AutosPage() {
       marca: auto.marca ?? "",
       modelo: auto.modelo ?? "",
       anio: auto.anio != null ? String(auto.anio) : "",
+      tienebono: toBool(auto.tienebono),
+      kmactual: auto.kmactual != null ? String(auto.kmactual) : "",
       miembros,
     })
     setEditError("")
@@ -109,9 +124,18 @@ export default function AutosPage() {
   function toggleEditMiembro(userId) {
     setEditForm((prev) => ({
       ...prev,
-      miembros: prev.miembros.includes(userId)
-        ? prev.miembros.filter((id) => id !== userId)
-        : [...prev.miembros, userId],
+      miembros: prev.miembros.some((m) => m.usuarioid === userId)
+        ? prev.miembros.filter((m) => m.usuarioid !== userId)
+        : [...prev.miembros, nuevoMiembro(userId)],
+    }))
+  }
+
+  function setMiembroFlag(userId, flag, value) {
+    setEditForm((prev) => ({
+      ...prev,
+      miembros: prev.miembros.map((m) =>
+        m.usuarioid === userId ? { ...m, [flag]: value } : m
+      ),
     }))
   }
 
@@ -124,21 +148,30 @@ export default function AutosPage() {
       await updateAuto(editTarget.id, {
         ...autoFields,
         anio: editForm.anio ? Number(editForm.anio) : undefined,
+        kmactual: editForm.kmactual ? Number(editForm.kmactual) : undefined,
       })
       await saveAutoUsuarios(editTarget.id, miembros)
       setAutos((prev) =>
         prev.map((a) =>
           a.id === editTarget.id
-            ? { ...a, ...autoFields, anio: editForm.anio ? Number(editForm.anio) : a.anio }
+            ? {
+                ...a,
+                ...autoFields,
+                anio: editForm.anio ? Number(editForm.anio) : a.anio,
+                kmactual: editForm.kmactual ? Number(editForm.kmactual) : a.kmactual,
+              }
             : a
         )
       )
       setAutoUsuarios((prev) => {
         const kept = prev.filter((r) => r.autoid !== editTarget.id)
-        const added = miembros.map((uid) => ({
+        const added = miembros.map((m) => ({
           id: crypto.randomUUID(),
           autoid: editTarget.id,
-          usuarioid: uid,
+          usuarioid: m.usuarioid,
+          dividegastos: m.dividegastos,
+          recibebono: m.recibebono,
+          pagaestanque: m.pagaestanque,
         }))
         return [...kept, ...added]
       })
@@ -172,7 +205,11 @@ export default function AutosPage() {
     setSaving(true)
     setError("")
     try {
-      await createAuto({ ...form, anio: form.anio ? Number(form.anio) : undefined })
+      await createAuto({
+        ...form,
+        anio: form.anio ? Number(form.anio) : undefined,
+        kmactual: form.kmactual ? Number(form.kmactual) : undefined,
+      })
       handleClose()
       setSuccess("Auto creado correctamente.")
       await refresh()
@@ -231,7 +268,10 @@ export default function AutosPage() {
                 </button>
               </div>
               <span className="list-item-sub">
-                {[auto.marca, auto.modelo, auto.patente, auto.anio].filter(Boolean).join(" · ")}
+                {[
+                  auto.marca, auto.modelo, auto.patente, auto.anio,
+                  auto.kmactual != null ? `${auto.kmactual.toLocaleString("es-CL")} km` : null,
+                ].filter(Boolean).join(" · ")}
               </span>
             </li>
           ))}
@@ -265,10 +305,27 @@ export default function AutosPage() {
             </label>
           </div>
 
-          <label>
-            <span>Año <span className="field-optional">(opcional)</span></span>
-            <input type="number" name="anio" min="1900" max="2100" value={editForm.anio} onChange={handleEditChange} />
-          </label>
+          <div className="split-fields">
+            <label>
+              <span>Año <span className="field-optional">(opcional)</span></span>
+              <input type="number" name="anio" min="1900" max="2100" value={editForm.anio} onChange={handleEditChange} />
+            </label>
+            <label>
+              <span>KM actual <span className="field-optional">(opcional)</span></span>
+              <input type="number" name="kmactual" min="0" value={editForm.kmactual} onChange={handleEditChange} />
+            </label>
+          </div>
+
+          <div>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={editForm.tienebono}
+                onChange={(e) => setEditForm((p) => ({ ...p, tienebono: e.target.checked }))}
+              />
+              Recibe bono <span className="field-optional">(dador regala su excedente: lo que paga − lo que usa)</span>
+            </label>
+          </div>
 
           <div>
             <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "var(--text-h)" }}>
@@ -280,18 +337,44 @@ export default function AutosPage() {
               </p>
             ) : (
               <ul className="participant-list">
-                {usuarios.map((u) => (
-                  <li key={u.id}>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={editForm.miembros.includes(u.id)}
-                        onChange={() => toggleEditMiembro(u.id)}
-                      />
-                      {u.nombre ?? u.email ?? u.id}
-                    </label>
-                  </li>
-                ))}
+                {usuarios.map((u) => {
+                  const m = editForm.miembros.find((x) => x.usuarioid === u.id)
+                  return (
+                    <li key={u.id}>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={!!m}
+                          onChange={() => toggleEditMiembro(u.id)}
+                        />
+                        {u.nombre ?? u.email ?? u.id}
+                      </label>
+                      {m && (
+                        <div style={{ margin: "4px 0 10px 26px", display: "flex", flexWrap: "wrap", gap: "6px 14px", fontSize: 13 }}>
+                          <label className="checkbox-label">
+                            <input type="checkbox" checked={m.dividegastos}
+                              onChange={(e) => setMiembroFlag(u.id, "dividegastos", e.target.checked)} />
+                            Divide gastos
+                          </label>
+                          {editForm.tienebono && (
+                            <>
+                              <label className="checkbox-label">
+                                <input type="checkbox" checked={m.recibebono}
+                                  onChange={(e) => setMiembroFlag(u.id, "recibebono", e.target.checked)} />
+                                Recibe bono
+                              </label>
+                              <label className="checkbox-label">
+                                <input type="checkbox" checked={m.pagaestanque}
+                                  onChange={(e) => setMiembroFlag(u.id, "pagaestanque", e.target.checked)} />
+                                Paga estanque
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
@@ -361,18 +444,42 @@ export default function AutosPage() {
             </label>
           </div>
 
-          <label>
-            <span>Año <span className="field-optional">(opcional)</span></span>
-            <input
-              type="number"
-              name="anio"
-              min="1900"
-              max="2100"
-              value={form.anio}
-              onChange={handleChange}
-              placeholder="2024"
-            />
-          </label>
+          <div className="split-fields">
+            <label>
+              <span>Año <span className="field-optional">(opcional)</span></span>
+              <input
+                type="number"
+                name="anio"
+                min="1900"
+                max="2100"
+                value={form.anio}
+                onChange={handleChange}
+                placeholder="2024"
+              />
+            </label>
+            <label>
+              <span>KM actual <span className="field-optional">(opcional)</span></span>
+              <input
+                type="number"
+                name="kmactual"
+                min="0"
+                value={form.kmactual}
+                onChange={handleChange}
+                placeholder="12500"
+              />
+            </label>
+          </div>
+
+          <div>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.tienebono}
+                onChange={(e) => setForm((p) => ({ ...p, tienebono: e.target.checked }))}
+              />
+              Recibe bono <span className="field-optional">(dador regala su excedente: lo que paga − lo que usa)</span>
+            </label>
+          </div>
 
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? "Guardando…" : "Crear auto"}

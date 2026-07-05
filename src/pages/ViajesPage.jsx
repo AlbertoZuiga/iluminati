@@ -18,7 +18,6 @@ export default function ViajesPage() {
   const [autoUsuarios, setAutoUsuarios] = useState([])
   const [participantes, setParticipantes] = useState([])
   const [form, setForm] = useState(EMPTY_FORM)
-  const [createStep, setCreateStep] = useState(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -28,6 +27,7 @@ export default function ViajesPage() {
   const [editForm, setEditForm] = useState(EMPTY_FORM)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
+  const [pendientesOpen, setPendientesOpen] = useState(false)
 
   useEffect(() => {
     if (!success) return
@@ -112,6 +112,52 @@ export default function ViajesPage() {
     return (participantesByViaje.get(viaje.id) ?? []).map((p) => usuarioNombre(p.usuarioid))
   }
 
+  const viajesOrdenados = useMemo(() => {
+    return [...viajes].sort((a, b) => {
+      const da = a.createdat ? new Date(a.createdat).getTime() : 0
+      const db = b.createdat ? new Date(b.createdat).getTime() : 0
+      return db - da
+    })
+  }, [viajes])
+
+  // Huecos de KM y viajes abiertos, calculados por auto visible
+  const pendientes = useMemo(() => {
+    const gaps = []
+    let abiertos = 0
+    for (const auto of autosVisibles) {
+      const viajesAuto = viajes
+        .filter((v) => v.auto === auto.id && v.kminicio != null)
+        .sort((a, b) => a.kminicio - b.kminicio)
+
+      let maxKmFin = null
+      for (let i = 0; i < viajesAuto.length; i++) {
+        const v = viajesAuto[i]
+        if (v.kmfin == null) abiertos++
+        else if (maxKmFin == null || v.kmfin > maxKmFin) maxKmFin = v.kmfin
+
+        const next = viajesAuto[i + 1]
+        if (v.kmfin != null && next && next.kminicio != null && v.kmfin < next.kminicio) {
+          gaps.push({
+            auto: auto.id,
+            kminicio: v.kmfin,
+            kmfin: next.kminicio,
+            km: next.kminicio - v.kmfin,
+          })
+        }
+      }
+
+      if (auto.kmactual != null && maxKmFin != null && auto.kmactual > maxKmFin) {
+        gaps.push({
+          auto: auto.id,
+          kminicio: maxKmFin,
+          kmfin: auto.kmactual,
+          km: auto.kmactual - maxKmFin,
+        })
+      }
+    }
+    return { gaps, abiertos, totalKm: gaps.reduce((sum, g) => sum + g.km, 0) }
+  }, [viajes, autosVisibles])
+
   function lastKmForAuto(autoId) {
     const kms = viajes
       .filter((v) => v.auto === autoId)
@@ -120,24 +166,41 @@ export default function ViajesPage() {
     return kms.length > 0 ? Math.max(...kms) : null
   }
 
+  function referenceKmForAuto(autoId) {
+    const auto = autosById.get(autoId)
+    if (auto?.kmactual != null) return auto.kmactual
+    return lastKmForAuto(autoId)
+  }
+
   function handleChange(e) {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   function handleAutoSelect(autoId) {
-    const lastKm = lastKmForAuto(autoId)
+    const refKm = referenceKmForAuto(autoId)
     const allowed = new Set(usuariosParaAuto(autoId).map((u) => u.id))
     setForm((prev) => ({
       ...prev,
       auto: autoId,
-      kminicio: lastKm != null ? String(lastKm) : prev.kminicio,
+      kminicio: refKm != null ? String(refKm) : prev.kminicio,
       participantes: prev.participantes.filter((id) => allowed.has(id)),
     }))
   }
 
   function handleEditAutoSelect(autoId) {
     setEditForm((prev) => ({ ...prev, auto: autoId }))
+  }
+
+  // Miembros del auto en edición + participantes existentes que ya no son miembros (para no perderlos)
+  function editUsuariosDisponibles() {
+    const base = usuariosParaAuto(editForm.auto)
+    const baseIds = new Set(base.map((u) => u.id))
+    const extras = editForm.participantes
+      .filter((id) => !baseIds.has(id))
+      .map((id) => usuariosById.get(id))
+      .filter(Boolean)
+    return [...base, ...extras]
   }
 
   function toggleParticipante(userId) {
@@ -158,25 +221,30 @@ export default function ViajesPage() {
     }))
   }
 
-  function handleOpenCreate() {
-    const preAuto = autosVisibles.length === 1 ? autosVisibles[0].id : ""
+  function handleOpenCreate(prefill) {
+    const preAuto = prefill?.auto ?? (autosVisibles.length === 1 ? autosVisibles[0].id : "")
     const preParticipantes = currentUserId ? [currentUserId] : []
     setForm({
       ...EMPTY_FORM,
       auto: preAuto,
       participantes: preParticipantes,
-      kminicio: preAuto ? (lastKmForAuto(preAuto) ?? "") + "" : "",
+      kminicio: prefill?.kminicio != null
+        ? String(prefill.kminicio)
+        : preAuto ? (referenceKmForAuto(preAuto) ?? "") + "" : "",
+      kmfin: prefill?.kmfin != null ? String(prefill.kmfin) : "",
     })
-    setCreateStep(1)
     setError("")
     setModalOpen(true)
   }
 
   function handleClose() {
     setModalOpen(false)
-    setCreateStep(1)
     setForm(EMPTY_FORM)
     setError("")
+  }
+
+  function handleOpenGap(gap) {
+    handleOpenCreate({ auto: gap.auto, kminicio: gap.kminicio, kmfin: gap.kmfin })
   }
 
   function handleOpenEdit(viaje) {
@@ -206,8 +274,12 @@ export default function ViajesPage() {
 
   async function handleEditSubmit(e) {
     e.preventDefault()
-    setEditSaving(true)
     setEditError("")
+    if (editForm.kmfin && Number(editForm.kmfin) <= Number(editForm.kminicio)) {
+      setEditError("El KM final debe ser mayor que el KM inicial.")
+      return
+    }
+    setEditSaving(true)
     try {
       await updateViaje(editTarget.id, {
         auto: editForm.auto,
@@ -249,15 +321,19 @@ export default function ViajesPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setSaving(true)
     setError("")
+    if (form.kmfin && Number(form.kmfin) <= Number(form.kminicio)) {
+      setError("El KM final debe ser mayor que el KM inicial.")
+      return
+    }
+    setSaving(true)
     try {
-      const viaje = await createViaje({
+      await createViaje({
         auto: form.auto,
         kminicio: form.kminicio ? Number(form.kminicio) : undefined,
         kmfin: form.kmfin ? Number(form.kmfin) : undefined,
+        participantes: form.participantes.join(","),
       })
-      await saveParticipantes(viaje.id, form.participantes)
       handleClose()
       setSuccess("Viaje registrado correctamente.")
       await refresh()
@@ -296,6 +372,12 @@ export default function ViajesPage() {
     )
   }
 
+  const formRefKm = form.auto ? referenceKmForAuto(form.auto) : null
+  const formKminicioNum = form.kminicio !== "" ? Number(form.kminicio) : null
+  const formGapKm = formRefKm != null && formKminicioNum != null && formKminicioNum > formRefKm
+    ? formKminicioNum - formRefKm
+    : null
+
   return (
     <section>
       {success && (
@@ -308,10 +390,48 @@ export default function ViajesPage() {
         <p className="section-count">
           {loading ? "Cargando…" : `${viajes.length} viaje${viajes.length !== 1 ? "s" : ""}`}
         </p>
-        <button className="btn btn-primary" onClick={handleOpenCreate}>
+        <button className="btn btn-primary" onClick={() => handleOpenCreate()}>
           + Registrar viaje
         </button>
       </div>
+
+      {!loading && (pendientes.gaps.length > 0 || pendientes.abiertos > 0) && (
+        <div
+          className="feedback-banner"
+          style={{ background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", marginBottom: 16 }}
+        >
+          <div
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, cursor: pendientes.gaps.length > 0 ? "pointer" : "default" }}
+            onClick={() => pendientes.gaps.length > 0 && setPendientesOpen((v) => !v)}
+          >
+            <span>
+              ⚠ {pendientes.gaps.length} tramo{pendientes.gaps.length !== 1 ? "s" : ""} sin registrar
+              {pendientes.totalKm > 0 ? ` (${pendientes.totalKm.toLocaleString("es-CL")} km)` : ""}
+              {pendientes.abiertos > 0
+                ? ` · ${pendientes.abiertos} viaje${pendientes.abiertos !== 1 ? "s" : ""} sin km final`
+                : ""}
+            </span>
+            {pendientes.gaps.length > 0 && <span>{pendientesOpen ? "▲" : "▼"}</span>}
+          </div>
+          {pendientesOpen && pendientes.gaps.length > 0 && (
+            <ul style={{ margin: "10px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+              {pendientes.gaps.map((gap, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{ width: "100%", textAlign: "left", color: "#9a3412", borderColor: "#fdba74" }}
+                    onClick={() => handleOpenGap(gap)}
+                  >
+                    {autoNombre(gap.auto)}: {gap.kminicio.toLocaleString("es-CL")} → {gap.kmfin.toLocaleString("es-CL")} km
+                    {" "}({gap.km.toLocaleString("es-CL")} km sin registrar)
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {loading && (
         <div className="skeleton-list">
@@ -325,7 +445,7 @@ export default function ViajesPage() {
 
       {!loading && viajes.length > 0 && (
         <ul className="data-list">
-          {viajes.map((viaje, i) => {
+          {viajesOrdenados.map((viaje, i) => {
             const nombres = viajeParticipantesNombres(viaje)
             return (
               <li key={viaje.id ?? `viaje-${i}`}>
@@ -345,6 +465,7 @@ export default function ViajesPage() {
                     nombres.length > 0 ? nombres.join(", ") : null,
                     viaje.kminicio != null ? `KM ini: ${viaje.kminicio}` : null,
                     viaje.kmfin != null ? `KM fin: ${viaje.kmfin}` : null,
+                    viaje.createdat ? new Date(viaje.createdat).toLocaleDateString("es-CL") : null,
                   ].filter(Boolean).join(" · ")}
                 </span>
               </li>
@@ -353,62 +474,60 @@ export default function ViajesPage() {
         </ul>
       )}
 
-      {/* Create — Step 1: Auto */}
-      <Modal
-        title={createStep === 1 ? "Registrar viaje — Auto" : "Registrar viaje — Participantes"}
-        open={modalOpen}
-        onClose={handleClose}
-      >
-        {createStep === 1 ? (
-          <div className="form-card">
-            <div>
-              <p className="auto-cards-label">Auto</p>
-              <AutoCards selected={form.auto} onSelect={handleAutoSelect} options={autosVisibles} />
-            </div>
+      {/* Create Modal */}
+      <Modal title="Registrar viaje" open={modalOpen} onClose={handleClose}>
+        <form className="form-card" onSubmit={handleSubmit}>
+          {error && (
+            <p className="feedback-banner feedback-error" role="alert">{error}</p>
+          )}
 
-            <div className="split-fields">
-              <label>
-                <span>KM inicial</span>
-                <input
-                  type="number"
-                  name="kminicio"
-                  min="0"
-                  value={form.kminicio}
-                  onChange={handleChange}
-                  placeholder="12500"
-                  required
-                />
-              </label>
-              <label>
-                <span>KM final <span className="field-optional">(opcional)</span></span>
-                <input
-                  type="number"
-                  name="kmfin"
-                  min="0"
-                  value={form.kmfin}
-                  onChange={handleChange}
-                  placeholder="12650"
-                />
-              </label>
-            </div>
-
-            <button
-              className="btn btn-primary"
-              onClick={() => setCreateStep(2)}
-              disabled={!form.auto}
-            >
-              Continuar →
-            </button>
+          <div>
+            <p className="auto-cards-label">Auto</p>
+            <AutoCards selected={form.auto} onSelect={handleAutoSelect} options={autosVisibles} />
           </div>
-        ) : (
-          /* Create — Step 2: Participantes */
-          <form className="form-card" onSubmit={handleSubmit}>
-            {error && (
-              <p className="feedback-banner feedback-error" role="alert">{error}</p>
-            )}
 
+          <div className="split-fields">
+            <label>
+              <span>KM inicial</span>
+              <input
+                type="number"
+                name="kminicio"
+                min="0"
+                value={form.kminicio}
+                onChange={handleChange}
+                placeholder="12500"
+                required
+              />
+            </label>
+            <label>
+              <span>KM final <span className="field-optional">(opcional)</span></span>
+              <input
+                type="number"
+                name="kmfin"
+                min="0"
+                value={form.kmfin}
+                onChange={handleChange}
+                placeholder="12650"
+              />
+            </label>
+          </div>
+
+          {formGapKm != null && (
+            <p
+              style={{
+                margin: 0, fontSize: 13, background: "#fff7ed",
+                border: "1px solid #fdba74", color: "#9a3412",
+                borderRadius: 8, padding: "8px 12px",
+              }}
+            >
+              Últimos km registrados: {formRefKm.toLocaleString("es-CL")} · quedarán{" "}
+              {formGapKm.toLocaleString("es-CL")} km sin registrar
+            </p>
+          )}
+
+          <div>
             <p className="auto-cards-label" style={{ marginTop: 0 }}>
-              Participantes de {autoNombre(form.auto)}
+              Participantes {form.auto ? `de ${autoNombre(form.auto)}` : ""}
             </p>
             {usuariosParaAuto(form.auto).length === 0 ? (
               <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
@@ -430,22 +549,16 @@ export default function ViajesPage() {
                 ))}
               </ul>
             )}
+          </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setCreateStep(1)}>
-                ← Atrás
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving || !form.auto}
-                style={{ flex: 1 }}
-              >
-                {saving ? "Guardando…" : "Registrar viaje"}
-              </button>
-            </div>
-          </form>
-        )}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={saving || !form.auto}
+          >
+            {saving ? "Guardando…" : "Registrar viaje"}
+          </button>
+        </form>
       </Modal>
 
       {/* Edit Modal */}
@@ -465,7 +578,7 @@ export default function ViajesPage() {
               Participantes
             </p>
             <ul className="participant-list">
-              {usuarios.map((u) => (
+              {editUsuariosDisponibles().map((u) => (
                 <li key={u.id}>
                   <label className="checkbox-label">
                     <input

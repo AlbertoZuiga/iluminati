@@ -8,6 +8,8 @@ function doGet(e) {
     if (action === "participantes") return respond(getParticipantes())
     if (action === "autousuarios") return respond(getAutoUsuarios())
     if (action === "gastos") return respond(getGastos())
+    if (action === "periodos") return respond(getPeriodos())
+    if (action === "saldos") return respond(getSaldos())
     if (action === "bootstrap") return respond({
       viajes: getViajes(),
       autos: getAutos(),
@@ -15,6 +17,7 @@ function doGet(e) {
       participantes: getParticipantes(),
       autousuarios: getAutoUsuarios(),
       gastos: getGastos(),
+      periodos: getPeriodos(),
     })
 
     return respondError("Acción no reconocida: " + action)
@@ -40,6 +43,9 @@ function doPost(e) {
     if (action === "setAutoUsuarios") return respond(setAutoUsuarios(params))
     if (action === "createGasto") return respond(createGasto(params))
     if (action === "updateGasto") return respond(updateGasto(params))
+    if (action === "createPeriodo") return respond(createPeriodo(params))
+    if (action === "updatePeriodo") return respond(updatePeriodo(params))
+    if (action === "cerrarPeriodo") return respond(cerrarPeriodo(params))
 
     return respondError("Acción no reconocida: " + action)
   } catch (err) {

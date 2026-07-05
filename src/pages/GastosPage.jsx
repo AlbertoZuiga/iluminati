@@ -155,7 +155,17 @@ export default function GastosPage() {
 
   const gastosVisibles = useMemo(() => {
     const ids = new Set(autosVisibles.map((a) => a.id))
-    return gastos.filter((g) => ids.has(g.auto))
+    const filtered = gastos.filter((g) => ids.has(g.auto))
+    return filtered.sort((a, b) => {
+      const dateA = a.fecha ? new Date(a.fecha).getTime() : -Infinity
+      const dateB = b.fecha ? new Date(b.fecha).getTime() : -Infinity
+
+      if (dateA === -Infinity && dateB === -Infinity) return 0
+      if (dateA === -Infinity) return 1
+      if (dateB === -Infinity) return -1
+
+      return dateB - dateA
+    })
   }, [gastos, autosVisibles])
 
   const editAutoOptions = useMemo(() => {
@@ -357,7 +367,14 @@ export default function GastosPage() {
           <GastoFields
             values={form}
             onChange={handleChange}
-            onSelectAuto={(id) => setForm((prev) => ({ ...prev, auto: id, pagadopor: "" }))}
+            onSelectAuto={(id) => {
+              const isMember = usuariosDeAuto(id).some((u) => u.id === currentUserId)
+              setForm((prev) => ({
+                ...prev,
+                auto: id,
+                pagadopor: isMember ? currentUserId : ""
+              }))
+            }}
             autoOptions={autosVisibles}
             usuarios={usuariosDeAuto(form.auto)}
           />
@@ -382,7 +399,24 @@ export default function GastosPage() {
           <GastoFields
             values={editForm}
             onChange={handleEditChange}
-            onSelectAuto={(id) => setEditForm((prev) => ({ ...prev, auto: id, pagadopor: "" }))}
+            onSelectAuto={(id) => {
+              const usuariosDelAuto = usuariosDeAuto(id)
+              setEditForm((prev) => {
+                const prevPagadoPor = prev.pagadopor
+                const prevStillMember = usuariosDelAuto.some((u) => u.id === prevPagadoPor)
+
+                if (prevStillMember) {
+                  return { ...prev, auto: id }
+                }
+
+                const currentIsMember = usuariosDelAuto.some((u) => u.id === currentUserId)
+                return {
+                  ...prev,
+                  auto: id,
+                  pagadopor: currentIsMember ? currentUserId : ""
+                }
+              })
+            }}
             autoOptions={editAutoOptions}
             usuarios={usuariosDeAuto(editForm.auto)}
           />
