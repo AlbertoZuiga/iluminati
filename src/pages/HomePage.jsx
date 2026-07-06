@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { createViaje, updateViaje, getSaldos } from "../services/api"
+import { createViaje, updateViaje } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
 import { useViajeForm, EMPTY_VIAJE_FORM, validateViajeForm } from "../hooks/useViajeForm"
@@ -7,9 +7,6 @@ import { usePendientesKm } from "../hooks/usePendientesKm"
 import { useData } from "../context/DataContext"
 import ViajeFormModal from "../components/ViajeFormModal"
 import FinalizarViajeModal from "../components/FinalizarViajeModal"
-
-// Cache de saldos a nivel de módulo (dura la sesión). En T3.2 pasará a DataContext.
-let saldosCache = null
 
 function clp(n) {
   const v = Math.round(Number(n) || 0)
@@ -26,6 +23,7 @@ export default function HomePage({ navigate }) {
     participantes, setParticipantes,
     loading,
     reload,
+    saldos, saldosError, fetchSaldos,
   } = useData()
   const autos = useMemo(() => autosRaw.filter((a) => a.activo !== false), [autosRaw])
   const usuarios = useMemo(() => usuariosRaw.filter((u) => u.activo !== false), [usuariosRaw])
@@ -35,9 +33,6 @@ export default function HomePage({ navigate }) {
   const [success, setSuccess] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
   const [finalizarTarget, setFinalizarTarget] = useState(null)
-
-  const [saldo, setSaldo] = useState(saldosCache)
-  const [saldoError, setSaldoError] = useState(false)
 
   useEffect(() => {
     if (!success) return
@@ -164,7 +159,6 @@ export default function HomePage({ navigate }) {
           usuarioid,
         })),
       ])
-      saldosCache = null
       reload()
     } catch (err) {
       setError(err.message || "No se pudo registrar el viaje")
@@ -177,21 +171,15 @@ export default function HomePage({ navigate }) {
     await updateViaje(viaje.id, { kmfin })
     setViajes((prev) => prev.map((v) => (v.id === viaje.id ? { ...v, kmfin } : v)))
     setSuccess("Viaje finalizado.")
-    saldosCache = null
     reload()
   }
 
-  // Saldo del periodo abierto: carga diferida, no bloquea el render de Home
+  // Saldo del periodo abierto: carga diferida vía cache del contexto, no bloquea el render.
   useEffect(() => {
-    if (saldosCache) return
-    let cancelled = false
-    getSaldos()
-      .then((d) => { if (cancelled) return; saldosCache = d; setSaldo(d) })
-      .catch(() => { if (!cancelled) setSaldoError(true) })
-    return () => { cancelled = true }
-  }, [])
+    fetchSaldos().catch(() => {})
+  }, [fetchSaldos])
 
-  const miTotal = saldo?.totales?.find((t) => t.usuarioid === currentUserId)
+  const miTotal = saldos?.totales?.find((t) => t.usuarioid === currentUserId)
   const neto = miTotal?.neto ?? 0
 
   function viajeParticipantes(viaje) {
@@ -312,11 +300,11 @@ export default function HomePage({ navigate }) {
             Ver saldos →
           </button>
         </div>
-        {saldoError ? (
+        {saldosError && !saldos ? (
           <p className="home-net">—</p>
-        ) : !saldo ? (
+        ) : !saldos ? (
           <p className="home-net-sub">Calculando…</p>
-        ) : !saldo.periodo ? (
+        ) : !saldos.periodo ? (
           <p className="home-net-sub">
             No hay un periodo abierto.{" "}
             <button type="button" className="home-card-link" onClick={() => navigate("/periodos")}>

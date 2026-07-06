@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { getSaldos } from "../services/api"
+import { useData } from "../context/DataContext"
 
 function clp(n) {
   const v = Math.round(Number(n) || 0)
@@ -7,36 +7,25 @@ function clp(n) {
 }
 
 export default function SaldosPage() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { saldos: data, saldosLoading, saldosError, fetchSaldos } = useData()
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState("")
 
-  function cargarSaldos({ background, onDone } = {}) {
-    if (background) setRefreshing(true)
-    else setLoading(true)
-    getSaldos()
-      .then((d) => { if (onDone?.cancelled) return; setData(d); setError("") })
-      .catch((err) => { if (onDone?.cancelled) return; setError(err.message || "No se pudieron calcular los saldos") })
-      .finally(() => {
-        if (onDone?.cancelled) return
-        setLoading(false)
-        setRefreshing(false)
-      })
+  // Usa el cache del contexto; solo pide si no hay datos aún.
+  useEffect(() => {
+    fetchSaldos().catch(() => {})
+  }, [fetchSaldos])
+
+  function actualizar() {
+    setRefreshing(true)
+    fetchSaldos({ force: true }).catch(() => {}).finally(() => setRefreshing(false))
   }
 
-  useEffect(() => {
-    const estado = { cancelled: false }
-    cargarSaldos({ onDone: estado })
-    return () => { estado.cancelled = true }
-  }, [])
-
-  if (loading) {
+  if (saldosLoading && !data) {
     return <section><div className="skeleton-list"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div></section>
   }
 
-  if (error) {
-    return <section><p className="feedback-banner feedback-error" role="alert">{error}</p></section>
+  if (saldosError && !data) {
+    return <section><p className="feedback-banner feedback-error" role="alert">No se pudieron calcular los saldos</p></section>
   }
 
   if (!data?.periodo) {
@@ -54,7 +43,7 @@ export default function SaldosPage() {
         </p>
         <button
           className="btn btn-ghost"
-          onClick={() => cargarSaldos({ background: true })}
+          onClick={actualizar}
           disabled={refreshing}
         >
           {refreshing ? "…" : "Actualizar"}

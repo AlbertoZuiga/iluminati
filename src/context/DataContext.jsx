@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { getBootstrap } from "../services/api"
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
+import { getBootstrap, getSaldos } from "../services/api"
 import { normalizeCollection } from "../utils/normalizeCollection"
 
 const DataContext = createContext(null)
@@ -41,6 +41,13 @@ export function DataProvider({ children }) {
   const [refreshing, setRefreshing] = useState(cached != null)
   const [error, setError] = useState("")
 
+  // Cache de saldos en sesión (una sola fuente para Home y SaldosPage).
+  const [saldos, setSaldos] = useState(null)
+  const [saldosLoading, setSaldosLoading] = useState(false)
+  const [saldosError, setSaldosError] = useState(false)
+  const saldosRef = useRef(null)
+  const saldosInFlight = useRef(null)
+
   function applyBootstrap(data) {
     setViajes(normalizeCollection(data?.viajes))
     setAutos(normalizeCollection(data?.autos))
@@ -52,6 +59,19 @@ export function DataProvider({ children }) {
     setError("")
     writeCachedBootstrap(data)
   }
+
+  const fetchSaldos = useCallback(({ force = false } = {}) => {
+    if (!force && saldosRef.current) return Promise.resolve(saldosRef.current)
+    if (saldosInFlight.current) return saldosInFlight.current
+    setSaldosLoading(true)
+    setSaldosError(false)
+    const p = getSaldos()
+      .then((d) => { saldosRef.current = d; setSaldos(d); return d })
+      .catch((err) => { setSaldosError(true); throw err })
+      .finally(() => { setSaldosLoading(false); saldosInFlight.current = null })
+    saldosInFlight.current = p
+    return p
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +91,12 @@ export function DataProvider({ children }) {
       .then((data) => applyBootstrap(data))
       .catch((err) => setError(err.message || "No se pudieron cargar los datos"))
       .finally(() => setRefreshing(false))
-  }, [])
+      .then(() => {
+        // Invalidar saldos: si ya estaban cargados en esta sesión, refrescarlos
+        // (deja ver los viejos hasta que llegue el fresco).
+        if (saldosRef.current != null) return fetchSaldos({ force: true }).catch(() => {})
+      })
+  }, [fetchSaldos])
 
   const value = {
     viajes, setViajes,
@@ -83,6 +108,7 @@ export function DataProvider({ children }) {
     periodos, setPeriodos,
     loading, refreshing, error,
     reload,
+    saldos, saldosLoading, saldosError, fetchSaldos,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
