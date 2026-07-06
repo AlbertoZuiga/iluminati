@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react"
 import { createViaje, updateViaje, saveParticipantes } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
+import { useViajeForm, EMPTY_VIAJE_FORM, validateViajeForm } from "../hooks/useViajeForm"
+import { usePendientesKm } from "../hooks/usePendientesKm"
 import { useData } from "../context/DataContext"
-import Modal from "../components/Modal"
-import AutoCards from "../components/AutoCards"
+import ViajeFormModal from "../components/ViajeFormModal"
+import FinalizarViajeModal from "../components/FinalizarViajeModal"
 import EditButton from "../components/EditButton"
-
-const EMPTY_FORM = { auto: "", participantes: [], kminicio: "", kmfin: "" }
 
 export default function ViajesPage() {
   const currentUserId = useCurrentUserId()
@@ -22,16 +22,16 @@ export default function ViajesPage() {
   } = useData()
   const autos = useMemo(() => autosRaw.filter((a) => a.activo !== false), [autosRaw])
   const usuarios = useMemo(() => usuariosRaw.filter((u) => u.activo !== false), [usuariosRaw])
-  const [form, setForm] = useState(EMPTY_FORM)
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
-  const [editForm, setEditForm] = useState(EMPTY_FORM)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
   const [pendientesOpen, setPendientesOpen] = useState(false)
+  const [finalizarTarget, setFinalizarTarget] = useState(null)
 
   useEffect(() => {
     if (!success) return
@@ -86,112 +86,34 @@ export default function ViajesPage() {
     })
   }, [viajes])
 
-  // Huecos de KM y viajes abiertos, calculados por auto visible
-  const pendientes = useMemo(() => {
-    const gaps = []
-    let abiertos = 0
-    for (const auto of autosVisibles) {
-      const viajesAuto = viajes
-        .filter((v) => v.auto === auto.id && v.kminicio != null)
-        .sort((a, b) => a.kminicio - b.kminicio)
+  // Huecos de KM, viajes abiertos y KM de referencia por auto visible
+  const pendientes = usePendientesKm(viajes, autosVisibles, autosById)
+  const { referenceKmForAuto } = pendientes
 
-      let maxKmFin = null
-      for (let i = 0; i < viajesAuto.length; i++) {
-        const v = viajesAuto[i]
-        if (v.kmfin == null) abiertos++
-        else if (maxKmFin == null || v.kmfin > maxKmFin) maxKmFin = v.kmfin
+  const create = useViajeForm(referenceKmForAuto)
+  const edit = useViajeForm(referenceKmForAuto)
 
-        const next = viajesAuto[i + 1]
-        if (v.kmfin != null && next && next.kminicio != null && v.kmfin < next.kminicio) {
-          gaps.push({
-            auto: auto.id,
-            kminicio: v.kmfin,
-            kmfin: next.kminicio,
-            km: next.kminicio - v.kmfin,
-          })
-        }
-      }
-
-      if (auto.kmactual != null && maxKmFin != null && auto.kmactual > maxKmFin) {
-        gaps.push({
-          auto: auto.id,
-          kminicio: maxKmFin,
-          kmfin: auto.kmactual,
-          km: auto.kmactual - maxKmFin,
-        })
-      }
-    }
-    return { gaps, abiertos, totalKm: gaps.reduce((sum, g) => sum + g.km, 0) }
-  }, [viajes, autosVisibles])
-
-  function lastKmForAuto(autoId) {
-    const kms = viajes
-      .filter((v) => v.auto === autoId)
-      .flatMap((v) => [v.kmfin, v.kminicio])
-      .filter((k) => k != null)
-    return kms.length > 0 ? Math.max(...kms) : null
-  }
-
-  function referenceKmForAuto(autoId) {
-    const auto = autosById.get(autoId)
-    if (auto?.kmactual != null) return auto.kmactual
-    return lastKmForAuto(autoId)
-  }
-
-  function handleChange(e) {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
-
-  function handleAutoSelect(autoId) {
-    const refKm = referenceKmForAuto(autoId)
-    const allowed = new Set(usuariosParaAuto(autoId).map((u) => u.id))
-    setForm((prev) => ({
-      ...prev,
-      auto: autoId,
-      kminicio: refKm != null ? String(refKm) : "",
-      participantes: prev.participantes.filter((id) => allowed.has(id)),
-    }))
-  }
-
-  function handleEditAutoSelect(autoId) {
-    setEditForm((prev) => ({ ...prev, auto: autoId }))
+  function handleCreateAutoSelect(autoId) {
+    const allowed = usuariosParaAuto(autoId).map((u) => u.id)
+    create.selectAutoWithPrefill(autoId, allowed)
   }
 
   // Miembros del auto en edición + participantes existentes que ya no son miembros (para no perderlos)
   function editUsuariosDisponibles() {
-    const base = usuariosParaAuto(editForm.auto)
+    const base = usuariosParaAuto(edit.form.auto)
     const baseIds = new Set(base.map((u) => u.id))
-    const extras = editForm.participantes
+    const extras = edit.form.participantes
       .filter((id) => !baseIds.has(id))
       .map((id) => usuariosById.get(id))
       .filter(Boolean)
     return [...base, ...extras]
   }
 
-  function toggleParticipante(userId) {
-    setForm((prev) => ({
-      ...prev,
-      participantes: prev.participantes.includes(userId)
-        ? prev.participantes.filter((id) => id !== userId)
-        : [...prev.participantes, userId],
-    }))
-  }
-
-  function toggleEditParticipante(userId) {
-    setEditForm((prev) => ({
-      ...prev,
-      participantes: prev.participantes.includes(userId)
-        ? prev.participantes.filter((id) => id !== userId)
-        : [...prev.participantes, userId],
-    }))
-  }
-
   function handleOpenCreate(prefill) {
     const preAuto = prefill?.auto ?? (autosVisibles.length === 1 ? autosVisibles[0].id : "")
     const preParticipantes = currentUserId ? [currentUserId] : []
-    setForm({
-      ...EMPTY_FORM,
+    create.setForm({
+      ...EMPTY_VIAJE_FORM,
       auto: preAuto,
       participantes: preParticipantes,
       kminicio: prefill?.kminicio != null
@@ -205,7 +127,7 @@ export default function ViajesPage() {
 
   function handleClose() {
     setModalOpen(false)
-    setForm(EMPTY_FORM)
+    create.setForm(EMPTY_VIAJE_FORM)
     setError("")
   }
 
@@ -218,7 +140,7 @@ export default function ViajesPage() {
       .filter((p) => p.viajeid === viaje.id)
       .map((p) => p.usuarioid)
     setEditTarget(viaje)
-    setEditForm({
+    edit.setForm({
       auto: viaje.auto ?? "",
       participantes: viajeParticipantes,
       kminicio: viaje.kminicio != null ? String(viaje.kminicio) : "",
@@ -229,46 +151,42 @@ export default function ViajesPage() {
 
   function handleCloseEdit() {
     setEditTarget(null)
-    setEditForm(EMPTY_FORM)
+    edit.setForm(EMPTY_VIAJE_FORM)
     setEditError("")
-  }
-
-  function handleEditChange(e) {
-    const { name, value } = e.target
-    setEditForm((prev) => ({ ...prev, [name]: value }))
   }
 
   async function handleEditSubmit(e) {
     e.preventDefault()
     setEditError("")
-    if (editForm.kmfin && Number(editForm.kmfin) <= Number(editForm.kminicio)) {
-      setEditError("El KM final debe ser mayor que el KM inicial.")
+    const invalid = validateViajeForm(edit.form)
+    if (invalid) {
+      setEditError(invalid)
       return
     }
     setEditSaving(true)
     try {
       await updateViaje(editTarget.id, {
-        auto: editForm.auto,
-        kminicio: editForm.kminicio ? Number(editForm.kminicio) : undefined,
-        kmfin: editForm.kmfin ? Number(editForm.kmfin) : undefined,
+        auto: edit.form.auto,
+        kminicio: edit.form.kminicio ? Number(edit.form.kminicio) : undefined,
+        kmfin: edit.form.kmfin ? Number(edit.form.kmfin) : undefined,
       })
-      await saveParticipantes(editTarget.id, editForm.participantes)
+      await saveParticipantes(editTarget.id, edit.form.participantes)
 
       setViajes((prev) =>
         prev.map((v) =>
           v.id === editTarget.id
             ? {
                 ...v,
-                auto: editForm.auto,
-                kminicio: editForm.kminicio ? Number(editForm.kminicio) : v.kminicio,
-                kmfin: editForm.kmfin ? Number(editForm.kmfin) : v.kmfin,
+                auto: edit.form.auto,
+                kminicio: edit.form.kminicio ? Number(edit.form.kminicio) : v.kminicio,
+                kmfin: edit.form.kmfin ? Number(edit.form.kmfin) : v.kmfin,
               }
             : v
         )
       )
       setParticipantes((prev) => {
         const kept = prev.filter((p) => p.viajeid !== editTarget.id)
-        const added = editForm.participantes.map((uid) => ({
+        const added = edit.form.participantes.map((uid) => ({
           id: crypto.randomUUID(),
           viajeid: editTarget.id,
           usuarioid: uid,
@@ -288,17 +206,18 @@ export default function ViajesPage() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError("")
-    if (form.kmfin && Number(form.kmfin) <= Number(form.kminicio)) {
-      setError("El KM final debe ser mayor que el KM inicial.")
+    const invalid = validateViajeForm(create.form)
+    if (invalid) {
+      setError(invalid)
       return
     }
     setSaving(true)
     try {
       const created = await createViaje({
-        auto: form.auto,
-        kminicio: form.kminicio ? Number(form.kminicio) : undefined,
-        kmfin: form.kmfin ? Number(form.kmfin) : undefined,
-        participantes: form.participantes.join(","),
+        auto: create.form.auto,
+        kminicio: create.form.kminicio ? Number(create.form.kminicio) : undefined,
+        kmfin: create.form.kmfin ? Number(create.form.kmfin) : undefined,
+        participantes: create.form.participantes.join(","),
       })
       handleClose()
       setSuccess("Viaje registrado correctamente.")
@@ -325,18 +244,19 @@ export default function ViajesPage() {
     }
   }
 
+  async function handleFinalizar(viaje, kmfin) {
+    await updateViaje(viaje.id, { kmfin })
+    setViajes((prev) => prev.map((v) => (v.id === viaje.id ? { ...v, kmfin } : v)))
+    setSuccess("Viaje finalizado.")
+    reload()
+  }
+
   function kmRecorridos(viaje) {
     if (viaje.kminicio != null && viaje.kmfin != null) {
       return `${viaje.kmfin - viaje.kminicio} km`
     }
     return null
   }
-
-  const formRefKm = form.auto ? referenceKmForAuto(form.auto) : null
-  const formKminicioNum = form.kminicio !== "" ? Number(form.kminicio) : null
-  const formGapKm = formRefKm != null && formKminicioNum != null && formKminicioNum > formRefKm
-    ? formKminicioNum - formRefKm
-    : null
 
   return (
     <section>
@@ -414,6 +334,18 @@ export default function ViajesPage() {
                   {kmRecorridos(viaje) && (
                     <span className="badge badge-active">{kmRecorridos(viaje)}</span>
                   )}
+                  {viaje.kmfin == null && (
+                    <>
+                      <span className="badge badge-warning">En curso</span>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setFinalizarTarget(viaje)}
+                      >
+                        Finalizar
+                      </button>
+                    </>
+                  )}
                   <EditButton onClick={() => handleOpenEdit(viaje)} />
                 </div>
                 <span className="list-item-sub">
@@ -430,141 +362,49 @@ export default function ViajesPage() {
         </ul>
       )}
 
-      {/* Create Modal */}
-      <Modal title="Registrar viaje" open={modalOpen} onClose={handleClose}>
-        <form className="form-card" onSubmit={handleSubmit}>
-          {error && (
-            <p className="feedback-banner feedback-error" role="alert">{error}</p>
-          )}
+      <ViajeFormModal
+        title="Registrar viaje"
+        open={modalOpen}
+        onClose={handleClose}
+        onSubmit={handleSubmit}
+        form={create.form}
+        onChange={create.handleChange}
+        onSelectAuto={handleCreateAutoSelect}
+        onToggleParticipante={create.toggleParticipante}
+        autoOptions={autosVisibles}
+        participantOptions={usuariosParaAuto(create.form.auto)}
+        participantesLabel={`Participantes ${create.form.auto ? `de ${autoNombre(create.form.auto)}` : ""}`}
+        gap={create.gap}
+        error={error}
+        saving={saving}
+        submitLabel="Registrar viaje"
+      />
 
-          <div>
-            <p className="auto-cards-label">Auto</p>
-            <AutoCards selected={form.auto} onSelect={handleAutoSelect} options={autosVisibles} />
-          </div>
+      <ViajeFormModal
+        title="Editar viaje"
+        open={editTarget !== null}
+        onClose={handleCloseEdit}
+        onSubmit={handleEditSubmit}
+        form={edit.form}
+        onChange={edit.handleChange}
+        onSelectAuto={edit.selectAuto}
+        onToggleParticipante={edit.toggleParticipante}
+        autoOptions={autos}
+        participantOptions={editUsuariosDisponibles()}
+        participantesLabel="Participantes"
+        gap={null}
+        error={editError}
+        saving={editSaving}
+        submitLabel="Guardar cambios"
+      />
 
-          <div className="split-fields">
-            <label>
-              <span>KM inicial</span>
-              <input
-                type="number"
-                name="kminicio"
-                min="0"
-                value={form.kminicio}
-                onChange={handleChange}
-                placeholder="12500"
-                required
-              />
-            </label>
-            <label>
-              <span>KM final <span className="field-optional">(opcional)</span></span>
-              <input
-                type="number"
-                name="kmfin"
-                min="0"
-                value={form.kmfin}
-                onChange={handleChange}
-                placeholder="12650"
-              />
-            </label>
-          </div>
-
-          {formGapKm != null && (
-            <p
-              style={{
-                margin: 0, fontSize: 13, background: "#fff7ed",
-                border: "1px solid #fdba74", color: "#9a3412",
-                borderRadius: 8, padding: "8px 12px",
-              }}
-            >
-              Últimos km registrados: {formRefKm.toLocaleString("es-CL")} · quedarán{" "}
-              {formGapKm.toLocaleString("es-CL")} km sin registrar
-            </p>
-          )}
-
-          <div>
-            <p className="auto-cards-label" style={{ marginTop: 0 }}>
-              Participantes {form.auto ? `de ${autoNombre(form.auto)}` : ""}
-            </p>
-            {usuariosParaAuto(form.auto).length === 0 ? (
-              <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
-                No hay usuarios activos registrados.
-              </p>
-            ) : (
-              <ul className="participant-list">
-                {usuariosParaAuto(form.auto).map((u) => (
-                  <li key={u.id}>
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={form.participantes.includes(u.id)}
-                        onChange={() => toggleParticipante(u.id)}
-                      />
-                      {u.nombre ?? u.email ?? u.id}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={saving || !form.auto}
-          >
-            {saving ? "Guardando…" : "Registrar viaje"}
-          </button>
-        </form>
-      </Modal>
-
-      {/* Edit Modal */}
-      <Modal title="Editar viaje" open={editTarget !== null} onClose={handleCloseEdit}>
-        <form className="form-card" onSubmit={handleEditSubmit}>
-          {editError && (
-            <p className="feedback-banner feedback-error" role="alert">{editError}</p>
-          )}
-
-          <div>
-            <p className="auto-cards-label">Auto</p>
-            <AutoCards selected={editForm.auto} onSelect={handleEditAutoSelect} options={autos} />
-          </div>
-
-          <div>
-            <p className="subsection-title">
-              Participantes
-            </p>
-            <ul className="participant-list">
-              {editUsuariosDisponibles().map((u) => (
-                <li key={u.id}>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={editForm.participantes.includes(u.id)}
-                      onChange={() => toggleEditParticipante(u.id)}
-                    />
-                    {u.nombre ?? u.email ?? u.id}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="split-fields">
-            <label>
-              <span>KM inicial</span>
-              <input type="number" name="kminicio" min="0" value={editForm.kminicio} onChange={handleEditChange} required />
-            </label>
-            <label>
-              <span>KM final <span className="field-optional">(opcional)</span></span>
-              <input type="number" name="kmfin" min="0" value={editForm.kmfin} onChange={handleEditChange} />
-            </label>
-          </div>
-
-          <button type="submit" className="btn btn-primary" disabled={editSaving || !editForm.auto}>
-            {editSaving ? "Guardando…" : "Guardar cambios"}
-          </button>
-        </form>
-      </Modal>
+      <FinalizarViajeModal
+        key={finalizarTarget?.id ?? "none"}
+        viaje={finalizarTarget}
+        autoNombre={autoNombre}
+        onClose={() => setFinalizarTarget(null)}
+        onFinalizar={handleFinalizar}
+      />
     </section>
   )
 }

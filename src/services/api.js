@@ -39,7 +39,10 @@ async function request(action, options = {}) {
   }
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20000)
+  // Los POST a GAS pueden tardar (cold start + LockService.waitLock de hasta 10s +
+  // escritura). Damos más margen a las escrituras que a las lecturas.
+  const timeoutMs = options.timeout ?? (method === "GET" ? 20000 : 45000)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   requestOptions.signal = controller.signal
 
   let response

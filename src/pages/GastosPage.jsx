@@ -82,7 +82,9 @@ export default function GastosPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [modalOpen, setModalOpen] = useState(false)
+  const [modalOpen, setModalOpen] = useState(
+    () => new URLSearchParams(window.location.search).get("nuevo") === "1"
+  )
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(emptyForm)
   const [editSaving, setEditSaving] = useState(false)
@@ -93,6 +95,13 @@ export default function GastosPage() {
     const t = setTimeout(() => setSuccess(""), 3000)
     return () => clearTimeout(t)
   }, [success])
+
+  // Limpiar el ?nuevo=1 de la URL tras abrir el modal desde Home
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("nuevo") === "1") {
+      window.history.replaceState(null, "", "/gastos")
+    }
+  }, [])
 
   const autosById = useMemo(() => new Map(autos.map((a) => [a.id, a])), [autos])
   const usuariosById = useMemo(() => new Map(usuarios.map((u) => [u.id, u])), [usuarios])

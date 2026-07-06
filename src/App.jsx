@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import HomePage from "./pages/HomePage"
 import AutosPage from "./pages/AutosPage"
 import UsuariosPage from "./pages/UsuariosPage"
 import ViajesPage from "./pages/ViajesPage"
@@ -11,6 +12,7 @@ import UserSelectModal from "./components/UserSelectModal"
 import "./App.css"
 
 const routes = {
+  "/": { label: "Inicio" },
   "/autos": { label: "Autos" },
   "/usuarios": { label: "Usuarios" },
   "/viajes": { label: "Viajes" },
@@ -21,7 +23,7 @@ const routes = {
 
 function getRoute() {
   const path = window.location.pathname
-  return routes[path] ? path : "/autos"
+  return routes[path] ? path : "/"
 }
 
 function App() {
@@ -34,8 +36,8 @@ function App() {
 
   useEffect(() => {
     if (!routes[window.location.pathname]) {
-      window.history.replaceState(null, "", "/autos")
-      setPage("/autos")
+      window.history.replaceState(null, "", "/")
+      setPage("/")
     }
     const handlePop = () => setPage(getRoute())
     window.addEventListener("popstate", handlePop)
@@ -57,7 +59,8 @@ function App() {
 
   function navigate(to) {
     window.history.pushState(null, "", to)
-    setPage(to)
+    const path = to.split("?")[0]
+    setPage(routes[path] ? path : "/")
   }
 
   return (
@@ -99,6 +102,7 @@ function App() {
 
       <main className="page-main">
         <h1 className="page-title">{routes[page].label}</h1>
+        {page === "/" && <HomePage navigate={navigate} />}
         {page === "/autos" && <AutosPage />}
         {page === "/usuarios" && <UsuariosPage />}
         {page === "/viajes" && <ViajesPage />}
