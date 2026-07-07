@@ -256,7 +256,7 @@ export default function ViajesPage() {
   return (
     <section>
       {success && (
-        <p className="feedback-banner feedback-success" aria-live="polite" style={{ marginBottom: 16 }}>
+        <p className="feedback-banner feedback-success feedback-banner-spaced" aria-live="polite">
           {success}
         </p>
       )}
@@ -271,10 +271,7 @@ export default function ViajesPage() {
       </div>
 
       {!loading && (pendientes.gaps.length > 0 || pendientes.abiertos > 0) && (
-        <div
-          className="feedback-banner"
-          style={{ background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", marginBottom: 16 }}
-        >
+        <div className="feedback-banner feedback-warning feedback-banner-spaced">
           <div
             style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, cursor: pendientes.gaps.length > 0 ? "pointer" : "default" }}
             onClick={() => pendientes.gaps.length > 0 && setPendientesOpen((v) => !v)}

@@ -328,6 +328,18 @@
   }
 }
 
+/* Separación inferior para banners que preceden contenido (no en grids con gap) */
+.feedback-banner-spaced {
+  margin-bottom: 16px;
+}
+
+/* Texto secundario en modales/tarjetas (antes inline repetido) */
+.hint-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
 /* ── Home dashboard ── */
 .home-grid {
   display: grid;

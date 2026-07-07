@@ -184,7 +184,7 @@ export default function AutosPage() {
   return (
     <section>
       {success && (
-        <p className="feedback-banner feedback-success" aria-live="polite" style={{ marginBottom: 16 }}>
+        <p className="feedback-banner feedback-success feedback-banner-spaced" aria-live="polite">
           {success}
         </p>
       )}
@@ -289,7 +289,7 @@ export default function AutosPage() {
               Miembros <span className="field-optional">(quiénes usan este auto)</span>
             </p>
             {usuarios.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+              <p className="hint-text">
                 No hay usuarios activos.
               </p>
             ) : (

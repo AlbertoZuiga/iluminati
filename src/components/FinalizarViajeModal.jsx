@@ -36,7 +36,7 @@ export default function FinalizarViajeModal({ viaje, autoNombre, onClose, onFina
             <p className="feedback-banner feedback-error" role="alert">{error}</p>
           )}
 
-          <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+          <p className="hint-text">
             <strong>{autoNombre(viaje.auto)}</strong>
             {viaje.kminicio != null ? ` · KM inicial: ${viaje.kminicio.toLocaleString("es-CL")}` : ""}
           </p>

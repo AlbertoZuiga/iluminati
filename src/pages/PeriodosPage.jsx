@@ -130,8 +130,8 @@ export default function PeriodosPage() {
 
   return (
     <section>
-      {success && <p className="feedback-banner feedback-success" aria-live="polite" style={{ marginBottom: 16 }}>{success}</p>}
-      {error && <p className="feedback-banner feedback-error" role="alert" style={{ marginBottom: 16 }}>{error}</p>}
+      {success && <p className="feedback-banner feedback-success feedback-banner-spaced" aria-live="polite">{success}</p>}
+      {error && <p className="feedback-banner feedback-error feedback-banner-spaced" role="alert">{error}</p>}
 
       {loading ? (
         <div className="skeleton-list"><div className="skeleton" /><div className="skeleton" /></div>

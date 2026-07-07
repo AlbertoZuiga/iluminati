@@ -102,7 +102,7 @@ export default function UsuariosPage() {
   return (
     <section>
       {success && (
-        <p className="feedback-banner feedback-success" aria-live="polite" style={{ marginBottom: 16 }}>
+        <p className="feedback-banner feedback-success feedback-banner-spaced" aria-live="polite">
           {success}
         </p>
       )}

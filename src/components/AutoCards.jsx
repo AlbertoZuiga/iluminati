@@ -1,6 +1,6 @@
 export default function AutoCards({ selected, onSelect, options }) {
   if (options.length === 0) {
-    return <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>No hay autos activos.</p>
+    return <p className="hint-text">No hay autos activos.</p>
   }
   return (
     <div className="auto-cards">

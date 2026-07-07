@@ -59,13 +59,7 @@ export default function ViajeFormModal({
         </div>
 
         {gap != null && (
-          <p
-            style={{
-              margin: 0, fontSize: 13, background: "#fff7ed",
-              border: "1px solid #fdba74", color: "#9a3412",
-              borderRadius: 8, padding: "8px 12px",
-            }}
-          >
+          <p className="feedback-banner feedback-warning">
             Últimos km registrados: {gap.refKm.toLocaleString("es-CL")} · quedarán{" "}
             {gap.km.toLocaleString("es-CL")} km sin registrar
           </p>
@@ -74,7 +68,7 @@ export default function ViajeFormModal({
         <div>
           <p className="auto-cards-label" style={{ marginTop: 0 }}>{participantesLabel}</p>
           {participantOptions.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+            <p className="hint-text">
               No hay usuarios activos registrados.
             </p>
           ) : (
