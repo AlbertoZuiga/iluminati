@@ -35,7 +35,10 @@ function sheetToObjects(sheet) {
   return data.slice(1).map(function (row) { return rowToObject(headers, row) })
 }
 
-function appendRowByHeaders(sheetName, values) {
+// sheetToObjects, values y actualizaciones se pisan cuando Sheets auto-parsea
+// texto tipo "Junio 2026" a fecha. `textFields` (nombres de columna, minúscula)
+// fuerza formato "@" (texto plano) en esa celda antes de escribir el valor.
+function appendRowByHeaders(sheetName, values, textFields) {
   const sheet = getSheet(sheetName)
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(function (h) { return String(h).trim().toLowerCase() })
@@ -43,9 +46,19 @@ function appendRowByHeaders(sheetName, values) {
     return Object.prototype.hasOwnProperty.call(values, h) ? values[h] : ""
   })
   sheet.appendRow(row)
+
+  if (textFields && textFields.length) {
+    const lastRow = sheet.getLastRow()
+    textFields.forEach(function (field) {
+      const col = headers.indexOf(field.toLowerCase())
+      if (col !== -1) {
+        sheet.getRange(lastRow, col + 1).setNumberFormat("@").setValue(values[field])
+      }
+    })
+  }
 }
 
-function updateRow(sheetName, id, updates) {
+function updateRow(sheetName, id, updates, textFields) {
   if (!id) throw new Error("Se requiere un ID")
 
   const sheet = getSheet(sheetName)
@@ -59,7 +72,10 @@ function updateRow(sheetName, id, updates) {
     if (String(data[i][idCol]) === String(id)) {
       Object.keys(updates).forEach(function(field) {
         const col = headers.indexOf(field.toLowerCase())
-        if (col !== -1) sheet.getRange(i + 1, col + 1).setValue(updates[field])
+        if (col === -1) return
+        const range = sheet.getRange(i + 1, col + 1)
+        if (textFields && textFields.indexOf(field) !== -1) range.setNumberFormat("@")
+        range.setValue(updates[field])
       })
       return { id: id }
     }

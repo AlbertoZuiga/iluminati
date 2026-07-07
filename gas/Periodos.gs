@@ -20,7 +20,7 @@ function createPeriodo(params) {
 
   appendRowByHeaders("Periodos", {
     id: id, nombre: nombre, fechainicio: fechaInicio, fechafin: "", createdat: now,
-  })
+  }, ["nombre"])
 
   return { id: id, nombre: nombre, fechainicio: fechaInicio, fechafin: null, createdat: now }
 }
@@ -55,7 +55,7 @@ function updatePeriodo(params) {
     if (otroAbierto) throw new Error("Ya existe otro periodo abierto. Ciérralo antes de reabrir este.")
   }
 
-  updateRow("Periodos", id, updates)
+  updateRow("Periodos", id, updates, ["nombre"])
   return { id: id, nombre: updates.nombre, fechainicio: nuevaInicio, fechafin: nuevaFin || null }
 }
 
