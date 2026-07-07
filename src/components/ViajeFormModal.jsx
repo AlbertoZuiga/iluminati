@@ -39,6 +39,7 @@ export default function ViajeFormModal({
               type="number"
               name="kminicio"
               min="0"
+              inputMode="numeric"
               value={form.kminicio}
               onChange={onChange}
               placeholder="12500"
@@ -51,6 +52,7 @@ export default function ViajeFormModal({
               type="number"
               name="kmfin"
               min="0"
+              inputMode="numeric"
               value={form.kmfin}
               onChange={onChange}
               placeholder="12650"
