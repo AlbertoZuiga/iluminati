@@ -269,7 +269,7 @@ export default function AutosPage() {
             </label>
             <label>
               <span>KM actual <span className="field-optional">(opcional)</span></span>
-              <input type="number" name="kmactual" min="0" value={editForm.kmactual} onChange={handleEditChange} />
+              <input type="number" name="kmactual" min="0" inputMode="numeric" value={editForm.kmactual} onChange={handleEditChange} />
             </label>
           </div>
 
@@ -420,6 +420,7 @@ export default function AutosPage() {
                 type="number"
                 name="kmactual"
                 min="0"
+                inputMode="numeric"
                 value={form.kmactual}
                 onChange={handleChange}
                 placeholder="12500"

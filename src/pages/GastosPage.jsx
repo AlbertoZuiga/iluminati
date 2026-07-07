@@ -47,6 +47,7 @@ function GastoFields({ values, onChange, onSelectAuto, autoOptions, usuarios }) 
             name="monto"
             min="0"
             step="1"
+            inputMode="decimal"
             value={values.monto}
             onChange={onChange}
             placeholder="25000"
