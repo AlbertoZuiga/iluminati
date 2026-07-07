@@ -82,14 +82,6 @@ async function request(action, options = {}) {
   return json.data ?? json
 }
 
-export async function getAutos() {
-  return request("autos")
-}
-
-export async function getUsuarios() {
-  return request("usuarios")
-}
-
 export async function createAuto(data) {
   return request("createAuto", { method: "POST", body: data })
 }
@@ -118,10 +110,6 @@ export async function getBootstrap() {
   return request("bootstrap")
 }
 
-export async function getViajes() {
-  return request("viajes")
-}
-
 export async function createViaje(data) {
   return request("createViaje", { method: "POST", body: data })
 }
@@ -130,19 +118,11 @@ export async function updateViaje(id, data) {
   return request("updateViaje", { method: "POST", body: { id, ...data } })
 }
 
-export async function getParticipantes() {
-  return request("participantes")
-}
-
 export async function saveParticipantes(viajeId, usuarioIds) {
   return request("setParticipantes", {
     method: "POST",
     body: { viajeid: viajeId, usuarioids: usuarioIds.join(",") },
   })
-}
-
-export async function getGastos() {
-  return request("gastos")
 }
 
 export async function createGasto(data) {
@@ -153,20 +133,12 @@ export async function updateGasto(id, data) {
   return request("updateGasto", { method: "POST", body: { id, ...data } })
 }
 
-export async function getAutoUsuarios() {
-  return request("autousuarios")
-}
-
 // miembros: [{ usuarioid, rol, dividegastos, recibebono, pagaestanque }]
 export async function saveAutoUsuarios(autoId, miembros) {
   return request("setAutoUsuarios", {
     method: "POST",
     body: { autoid: autoId, miembros: JSON.stringify(miembros) },
   })
-}
-
-export async function getPeriodos() {
-  return request("periodos")
 }
 
 export async function createPeriodo(data = {}) {
