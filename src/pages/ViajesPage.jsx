@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { createViaje, updateViaje, saveParticipantes } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
 import { useViajeForm, EMPTY_VIAJE_FORM, validateViajeForm } from "../hooks/useViajeForm"
 import { usePendientesKm } from "../hooks/usePendientesKm"
+import useFeedback from "../hooks/useFeedback"
 import { useData } from "../context/DataContext"
 import ViajeFormModal from "../components/ViajeFormModal"
 import FinalizarViajeModal from "../components/FinalizarViajeModal"
@@ -25,19 +26,13 @@ export default function ViajesPage() {
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  const { success, showSuccess } = useFeedback()
   const [modalOpen, setModalOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
   const [pendientesOpen, setPendientesOpen] = useState(false)
   const [finalizarTarget, setFinalizarTarget] = useState(null)
-
-  useEffect(() => {
-    if (!success) return
-    const t = setTimeout(() => setSuccess(""), 3000)
-    return () => clearTimeout(t)
-  }, [success])
 
   const autosById = useMemo(() => new Map(autos.map((a) => [a.id, a])), [autos])
   const usuariosById = useMemo(() => new Map(usuarios.map((u) => [u.id, u])), [usuarios])
@@ -195,7 +190,7 @@ export default function ViajesPage() {
       })
 
       handleCloseEdit()
-      setSuccess("Viaje actualizado.")
+      showSuccess("Viaje actualizado.")
     } catch (err) {
       setEditError(err.message || "No se pudo actualizar el viaje")
     } finally {
@@ -220,7 +215,7 @@ export default function ViajesPage() {
         participantes: create.form.participantes.join(","),
       })
       handleClose()
-      setSuccess("Viaje registrado correctamente.")
+      showSuccess("Viaje registrado correctamente.")
       setViajes((prev) => [...prev, {
         id: created.id,
         auto: created.auto,
@@ -247,7 +242,7 @@ export default function ViajesPage() {
   async function handleFinalizar(viaje, kmfin) {
     await updateViaje(viaje.id, { kmfin })
     setViajes((prev) => prev.map((v) => (v.id === viaje.id ? { ...v, kmfin } : v)))
-    setSuccess("Viaje finalizado.")
+    showSuccess("Viaje finalizado.")
     reload()
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { createGasto, updateGasto } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
+import useFeedback from "../hooks/useFeedback"
 import { useData } from "../context/DataContext"
 import Modal from "../components/Modal"
 import AutoCards from "../components/AutoCards"
@@ -81,7 +82,7 @@ export default function GastosPage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  const { success, showSuccess } = useFeedback()
   const [modalOpen, setModalOpen] = useState(
     () => new URLSearchParams(window.location.search).get("nuevo") === "1"
   )
@@ -89,12 +90,6 @@ export default function GastosPage() {
   const [editForm, setEditForm] = useState(emptyForm)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
-
-  useEffect(() => {
-    if (!success) return
-    const t = setTimeout(() => setSuccess(""), 3000)
-    return () => clearTimeout(t)
-  }, [success])
 
   // Limpiar el ?nuevo=1 de la URL tras abrir el modal desde Home
   useEffect(() => {
@@ -216,7 +211,7 @@ export default function GastosPage() {
         pagadopor: form.pagadopor,
       })
       handleClose()
-      setSuccess("Gasto registrado correctamente.")
+      showSuccess("Gasto registrado correctamente.")
       setGastos((prev) => [...prev, {
         id: created.id,
         auto: created.auto,
@@ -261,7 +256,7 @@ export default function GastosPage() {
         )
       )
       handleCloseEdit()
-      setSuccess("Gasto actualizado.")
+      showSuccess("Gasto actualizado.")
     } catch (err) {
       setEditError(err.message || "No se pudo actualizar el gasto")
     } finally {

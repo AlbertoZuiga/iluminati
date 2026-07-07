@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { createUsuario, updateUsuario } from "../services/api"
 import { useData } from "../context/DataContext"
+import useFeedback from "../hooks/useFeedback"
 import Modal from "../components/Modal"
 import EditButton from "../components/EditButton"
 
@@ -11,19 +12,13 @@ export default function UsuariosPage() {
   const [form, setForm] = useState(INITIAL_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  const { success, showSuccess } = useFeedback()
   const [modalOpen, setModalOpen] = useState(false)
   const [toggling, setToggling] = useState(new Set())
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState({ nombre: "" })
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
-
-  useEffect(() => {
-    if (!success) return
-    const timer = setTimeout(() => setSuccess(""), 3000)
-    return () => clearTimeout(timer)
-  }, [success])
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -63,7 +58,7 @@ export default function UsuariosPage() {
         prev.map((x) => x.id === editTarget.id ? { ...x, ...editForm } : x)
       )
       handleCloseEdit()
-      setSuccess("Usuario actualizado.")
+      showSuccess("Usuario actualizado.")
     } catch (err) {
       setEditError(err.message || "No se pudo actualizar el usuario")
     } finally {
@@ -94,7 +89,7 @@ export default function UsuariosPage() {
     try {
       const created = await createUsuario(form)
       handleClose()
-      setSuccess("Usuario creado correctamente.")
+      showSuccess("Usuario creado correctamente.")
       setUsuarios((prev) => [...prev, created])
       reload()
     } catch (err) {

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { createPeriodo, updatePeriodo, cerrarPeriodo } from "../services/api"
 import { useData } from "../context/DataContext"
+import useFeedback from "../hooks/useFeedback"
 import Modal from "../components/Modal"
 import EditButton from "../components/EditButton"
 
@@ -24,18 +25,12 @@ export default function PeriodosPage() {
   const [nombre, setNombre] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  const { success, showSuccess } = useFeedback()
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState({ nombre: "", fechainicio: "", fechafin: "" })
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
   const [confirmCerrarOpen, setConfirmCerrarOpen] = useState(false)
-
-  useEffect(() => {
-    if (!success) return
-    const t = setTimeout(() => setSuccess(""), 3000)
-    return () => clearTimeout(t)
-  }, [success])
 
   const abierto = useMemo(() => periodos.find((p) => !p.fechafin) || null, [periodos])
   const cerrados = useMemo(
@@ -51,7 +46,7 @@ export default function PeriodosPage() {
       await createPeriodo({ nombre })
       setNombre("")
       await reload()
-      setSuccess("Periodo abierto.")
+      showSuccess("Periodo abierto.")
     } catch (err) {
       setError(err.message || "No se pudo abrir el periodo")
     } finally {
@@ -69,7 +64,7 @@ export default function PeriodosPage() {
     try {
       await cerrarPeriodo({})
       await reload()
-      setSuccess("Periodo cerrado. Se abrió el siguiente.")
+      showSuccess("Periodo cerrado. Se abrió el siguiente.")
       setConfirmCerrarOpen(false)
     } catch (err) {
       setError(err.message || "No se pudo cerrar el periodo")
@@ -125,7 +120,7 @@ export default function PeriodosPage() {
       await updatePeriodo(editTarget.id, payload)
       await reload()
       handleCloseEdit()
-      setSuccess("Periodo actualizado.")
+      showSuccess("Periodo actualizado.")
     } catch (err) {
       setEditError(err.message || "No se pudo actualizar el periodo")
     } finally {

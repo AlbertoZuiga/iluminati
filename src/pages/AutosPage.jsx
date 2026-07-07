@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { createAuto, updateAuto, saveAutoUsuarios } from "../services/api"
 import { useData } from "../context/DataContext"
+import useFeedback from "../hooks/useFeedback"
 import Modal from "../components/Modal"
 import EditButton from "../components/EditButton"
 
@@ -27,19 +28,13 @@ export default function AutosPage() {
   const [form, setForm] = useState(INITIAL_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  const { success, showSuccess } = useFeedback()
   const [modalOpen, setModalOpen] = useState(false)
   const [toggling, setToggling] = useState(new Set())
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(INITIAL_EDIT_FORM)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
-
-  useEffect(() => {
-    if (!success) return
-    const timer = setTimeout(() => setSuccess(""), 3000)
-    return () => clearTimeout(timer)
-  }, [success])
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -141,7 +136,7 @@ export default function AutosPage() {
         return [...kept, ...added]
       })
       handleCloseEdit()
-      setSuccess("Auto actualizado.")
+      showSuccess("Auto actualizado.")
     } catch (err) {
       setEditError(err.message || "No se pudo actualizar el auto")
     } finally {
@@ -176,7 +171,7 @@ export default function AutosPage() {
         kmactual: form.kmactual ? Number(form.kmactual) : undefined,
       })
       handleClose()
-      setSuccess("Auto creado correctamente.")
+      showSuccess("Auto creado correctamente.")
       setAutos((prev) => [...prev, created])
       reload()
     } catch (err) {
