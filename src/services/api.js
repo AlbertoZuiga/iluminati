@@ -1,10 +1,15 @@
 const API_URL = import.meta.env.DEV ? "/api" : import.meta.env.VITE_API_URL
 
-function buildUrl(action) {
+function buildUrl(action, params) {
   if (!API_URL) throw new Error("VITE_API_URL no está configurada")
 
   const url = new URL(API_URL, window.location.origin)
   url.searchParams.set("action", action)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value))
+    }
+  })
   return url.toString()
 }
 
@@ -20,7 +25,7 @@ function toFormBody(data) {
 
 async function request(action, options = {}) {
   const method = options.method || "GET"
-  const url = buildUrl(action)
+  const url = buildUrl(action, options.params)
 
   const requestOptions = {
     method,
@@ -155,4 +160,8 @@ export async function cerrarPeriodo(data = {}) {
 
 export async function getSaldos() {
   return request("saldos")
+}
+
+export async function getLiquidacion(periodoid) {
+  return request("liquidacion", { params: { periodoid } })
 }

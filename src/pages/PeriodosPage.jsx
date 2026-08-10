@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react"
-import { createPeriodo, updatePeriodo, cerrarPeriodo } from "../services/api"
+import { useMemo, useRef, useState } from "react"
+import { createPeriodo, updatePeriodo, cerrarPeriodo, getLiquidacion } from "../services/api"
 import { useData } from "../context/DataContext"
 import useFeedback from "../hooks/useFeedback"
 import Modal from "../components/Modal"
 import EditButton from "../components/EditButton"
+import LiquidacionDetalle from "../components/LiquidacionDetalle"
 
 function fmtFecha(v) {
   if (!v) return "—"
@@ -31,6 +32,11 @@ export default function PeriodosPage() {
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
   const [confirmCerrarOpen, setConfirmCerrarOpen] = useState(false)
+  const [liqTarget, setLiqTarget] = useState(null)
+  const [liqLoading, setLiqLoading] = useState(false)
+  const [liqError, setLiqError] = useState("")
+  const [liqData, setLiqData] = useState(null)
+  const liqReqRef = useRef(null) // descarta respuestas de una liquidación ya descartada
 
   const abierto = useMemo(() => periodos.find((p) => !p.fechafin) || null, [periodos])
   const cerrados = useMemo(
@@ -71,6 +77,25 @@ export default function PeriodosPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  function handleOpenLiquidacion(p) {
+    setLiqTarget(p)
+    setLiqData(null)
+    setLiqError("")
+    setLiqLoading(true)
+    liqReqRef.current = p.id
+    getLiquidacion(p.id)
+      .then((data) => { if (liqReqRef.current === p.id) setLiqData(data) })
+      .catch((err) => { if (liqReqRef.current === p.id) setLiqError(err.message || "No se pudo cargar la liquidación") })
+      .finally(() => { if (liqReqRef.current === p.id) setLiqLoading(false) })
+  }
+
+  function handleCloseLiquidacion() {
+    liqReqRef.current = null
+    setLiqTarget(null)
+    setLiqData(null)
+    setLiqError("")
   }
 
   function handleOpenEdit(p) {
@@ -179,6 +204,14 @@ export default function PeriodosPage() {
                     <EditButton onClick={() => handleOpenEdit(p)} />
                   </div>
                   <span className="list-item-sub">{fmtFecha(p.fechainicio)} — {fmtFecha(p.fechafin)}</span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ marginTop: 8 }}
+                    onClick={() => handleOpenLiquidacion(p)}
+                  >
+                    Ver liquidación
+                  </button>
                 </li>
               ))}
             </ul>
@@ -213,6 +246,27 @@ export default function PeriodosPage() {
             {editSaving ? "Guardando…" : "Guardar cambios"}
           </button>
         </form>
+      </Modal>
+
+      <Modal
+        title={`Liquidación · ${liqTarget?.nombre || "Sin nombre"}`}
+        open={liqTarget !== null}
+        onClose={handleCloseLiquidacion}
+      >
+        {liqLoading ? (
+          <div className="skeleton-list"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div>
+        ) : liqError ? (
+          <p className="feedback-banner feedback-error" role="alert">{liqError}</p>
+        ) : liqData ? (
+          <>
+            {liqData.snapshot === false && (
+              <p className="list-item-sub" style={{ margin: "0 0 12px" }}>
+                Recalculado (cerrado antes del sistema de snapshots)
+              </p>
+            )}
+            <LiquidacionDetalle data={liqData} />
+          </>
+        ) : null}
       </Modal>
 
       <Modal title="Cerrar periodo" open={confirmCerrarOpen} onClose={() => !busy && setConfirmCerrarOpen(false)}>
