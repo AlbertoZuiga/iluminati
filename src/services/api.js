@@ -55,7 +55,9 @@ async function request(action, options = {}) {
     response = await fetch(url, requestOptions)
   } catch (err) {
     if (err.name === "AbortError") {
-      throw new Error("La API tardó demasiado en responder. Revisa la conexión o el despliegue.")
+      throw new Error("La API tardó demasiado en responder. Revisa la conexión o el despliegue.", {
+        cause: err,
+      })
     }
     throw new Error(`No se pudo conectar con la API. ${err.message || "Failed to fetch"}`, {
       cause: err,
