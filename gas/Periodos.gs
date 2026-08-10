@@ -56,6 +56,16 @@ function updatePeriodo(params) {
   }
 
   updateRow("Periodos", id, updates, ["nombre"])
+
+  // Mover las fechas de un periodo cerrado deja su snapshot desalineado: lo regenera.
+  if (nuevaFin && (params.fechainicio !== undefined || params.fechafin !== undefined)) {
+    guardarLiquidacion(Object.assign({}, actual, {
+      nombre: updates.nombre !== undefined ? updates.nombre : actual.nombre,
+      fechainicio: nuevaInicio,
+      fechafin: nuevaFin,
+    }))
+  }
+
   return { id: id, nombre: updates.nombre, fechainicio: nuevaInicio, fechafin: nuevaFin || null }
 }
 
@@ -65,6 +75,9 @@ function cerrarPeriodo(params) {
   if (!abierto) throw new Error("No hay un periodo abierto para cerrar")
 
   const corte = (params.fecha || "").trim() || new Date().toISOString()
+
+  // Congela la liquidación ANTES de cerrar: si falla, el periodo sigue abierto.
+  guardarLiquidacion(Object.assign({}, abierto, { fechafin: corte }))
 
   updateRow("Periodos", abierto.id, { fechafin: corte })
 
