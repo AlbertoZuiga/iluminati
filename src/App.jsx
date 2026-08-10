@@ -28,8 +28,8 @@ function getRoute() {
 
 function App() {
   const [page, setPage] = useState(getRoute)
-  const [userModalOpen, setUserModalOpen] = useState(false)
   const currentUserId = useCurrentUserId()
+  const [userModalOpen, setUserModalOpen] = useState(false)
   const { usuarios, loading, error, reload } = useData()
   const usuariosActivos = useMemo(() => usuarios.filter((u) => u.activo !== false), [usuarios])
   const currentUser = usuariosActivos.find((u) => u.id === currentUserId)
@@ -37,16 +37,11 @@ function App() {
   useEffect(() => {
     if (!routes[window.location.pathname]) {
       window.history.replaceState(null, "", "/")
-      setPage("/")
     }
     const handlePop = () => setPage(getRoute())
     window.addEventListener("popstate", handlePop)
     return () => window.removeEventListener("popstate", handlePop)
   }, [])
-
-  useEffect(() => {
-    if (!currentUserId) setUserModalOpen(true)
-  }, [currentUserId])
 
   function handleSelectUser(id) {
     setCurrentUserId(id)
@@ -112,7 +107,7 @@ function App() {
       </main>
 
       <UserSelectModal
-        open={userModalOpen}
+        open={userModalOpen || !currentUserId}
         forced={!currentUserId}
         usuarios={usuariosActivos}
         loading={loading}
