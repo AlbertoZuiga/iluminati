@@ -10,6 +10,7 @@ function doGet(e) {
     if (action === "gastos") return respond(getGastos())
     if (action === "periodos") return respond(getPeriodos())
     if (action === "saldos") return respond(getSaldos())
+    if (action === "liquidacion") return respond(getLiquidacion(e.parameter.periodoid))
     if (action === "bootstrap") return respond({
       viajes: getViajes(),
       autos: getAutos(),

@@ -4,7 +4,11 @@ function getSaldos() {
   if (!periodo) {
     return { periodo: null, autos: [], totales: [], transferencias: [] }
   }
+  return calcularSaldos(periodo)
+}
 
+// Calcula la liquidación de un periodo cualquiera (abierto o cerrado).
+function calcularSaldos(periodo) {
   const startTs = toLocalDayTs(periodo.fechainicio)
   const endTs = periodo.fechafin ? toLocalDayTs(periodo.fechafin) : Infinity
   function inPeriodo(dateVal) {
