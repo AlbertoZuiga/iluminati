@@ -84,6 +84,60 @@ function updateRow(sheetName, id, updates, textFields) {
   throw new Error("Registro no encontrado")
 }
 
+// Borrado duro: elimina la fila con ese Id. El historial de versiones del Sheet es el undo.
+function deleteRowById(sheetName, id) {
+  if (!id) throw new Error("Se requiere un ID")
+
+  const sheet = getSheet(sheetName)
+  const data = sheet.getDataRange().getValues()
+  const headers = data[0].map(function (h) { return String(h).trim().toLowerCase() })
+  const idCol = headers.indexOf("id")
+
+  if (idCol === -1) throw new Error("Columna 'id' no encontrada")
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === String(id)) {
+      sheet.deleteRow(i + 1)
+      return { id: id }
+    }
+  }
+
+  throw new Error("Registro no encontrado en '" + sheetName + "': " + id)
+}
+
+// Un periodo está cerrado si tiene fechafin. Ventana half-open [fechainicio, fechafin).
+function assertNoEnPeriodoCerrado(dateVal) {
+  const t = toLocalDayTs(dateVal)
+  if (isNaN(t)) return
+
+  const cerrado = getPeriodos().filter(function (p) {
+    if (!p.fechafin) return false
+    const startTs = toLocalDayTs(p.fechainicio)
+    const endTs = toLocalDayTs(p.fechafin)
+    return !isNaN(startTs) && !isNaN(endTs) && t >= startTs && t < endTs
+  })[0]
+
+  if (cerrado) throw new Error("El registro pertenece a un periodo ya cerrado")
+}
+
+// Mismo patrón de lock que usaba createViaje: script lock, 10s, release en finally.
+// Re-entrante: si una función envuelta llama a otra envuelta (cerrarPeriodo → createPeriodo),
+// la interna no vuelve a tomar ni suelta el lock del llamador.
+var LOCK_TOMADO = false
+function withLock(fn) {
+  if (LOCK_TOMADO) return fn()
+
+  const lock = LockService.getScriptLock()
+  lock.waitLock(10000)
+  LOCK_TOMADO = true
+  try {
+    return fn()
+  } finally {
+    LOCK_TOMADO = false
+    lock.releaseLock()
+  }
+}
+
 function softDelete(sheetName, id) {
   if (!id) throw new Error("Se requiere un ID")
 

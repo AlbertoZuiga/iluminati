@@ -3,42 +3,69 @@ function getGastos() {
 }
 
 function createGasto(params) {
-  const autoId = (params.auto || "").trim()
-  const fecha = (params.fecha || "").trim()
-  const tipo = (params.tipo || "").trim()
-  const monto = params.monto != null && params.monto !== "" ? Number(params.monto) : null
-  const pagadoPor = (params.pagadopor || "").trim()
+  return withLock(function () {
+    const autoId = (params.auto || "").trim()
+    const fecha = (params.fecha || "").trim()
+    const tipo = (params.tipo || "").trim()
+    const monto = params.monto != null && params.monto !== "" ? Number(params.monto) : null
+    const pagadoPor = (params.pagadopor || "").trim()
 
-  if (!autoId) throw new Error("El auto es requerido")
-  if (!fecha) throw new Error("La fecha es requerida")
-  if (!tipo) throw new Error("El tipo es requerido")
-  if (monto == null || isNaN(monto) || monto <= 0) throw new Error("El monto debe ser mayor a 0")
-  if (!pagadoPor) throw new Error("Quién pagó es requerido")
+    if (!autoId) throw new Error("El auto es requerido")
+    if (!fecha) throw new Error("La fecha es requerida")
+    if (!tipo) throw new Error("El tipo es requerido")
+    if (monto == null || isNaN(monto) || monto <= 0) throw new Error("El monto debe ser mayor a 0")
+    if (!pagadoPor) throw new Error("Quién pagó es requerido")
 
-  const id = Utilities.getUuid()
-  const now = new Date().toISOString()
+    const id = Utilities.getUuid()
+    const now = new Date().toISOString()
 
-  appendRowByHeaders("Gastos", {
-    id: id, auto: autoId, fecha: fecha, tipo: tipo, monto: monto, pagadopor: pagadoPor, createdat: now,
+    appendRowByHeaders("Gastos", {
+      id: id, auto: autoId, fecha: fecha, tipo: tipo, monto: monto, pagadopor: pagadoPor, createdat: now,
+    })
+
+    return { id: id, auto: autoId, fecha: fecha, tipo: tipo, monto: monto, pagadopor: pagadoPor, createdat: now }
   })
-
-  return { id: id, auto: autoId, fecha: fecha, tipo: tipo, monto: monto, pagadopor: pagadoPor, createdat: now }
 }
 
 function updateGasto(params) {
-  const id = params.id
-  if (!id) throw new Error("Se requiere un ID")
+  return withLock(function () {
+    const id = params.id
+    if (!id) throw new Error("Se requiere un ID")
 
-  const updates = {}
-  if (params.auto !== undefined) updates.auto = String(params.auto).trim()
-  if (params.fecha !== undefined && params.fecha !== "") updates.fecha = String(params.fecha).trim()
-  if (params.tipo !== undefined) updates.tipo = String(params.tipo).trim()
-  if (params.monto !== undefined && params.monto !== "") {
-    const monto = Number(params.monto)
-    if (isNaN(monto) || monto <= 0) throw new Error("El monto debe ser mayor a 0")
-    updates.monto = monto
-  }
-  if (params.pagadopor !== undefined) updates.pagadopor = String(params.pagadopor).trim()
+    const gasto = getGastos().filter(function (g) { return String(g.id) === String(id) })[0]
+    if (!gasto) throw new Error("Gasto no encontrado")
 
-  return updateRow("Gastos", id, updates)
+    // Ni editar un gasto que ya quedó liquidado, ni moverlo hacia un periodo cerrado.
+    assertNoEnPeriodoCerrado(gasto.fecha)
+
+    const updates = {}
+    if (params.auto !== undefined) updates.auto = String(params.auto).trim()
+    if (params.fecha !== undefined && params.fecha !== "") {
+      updates.fecha = String(params.fecha).trim()
+      assertNoEnPeriodoCerrado(updates.fecha)
+    }
+    if (params.tipo !== undefined) updates.tipo = String(params.tipo).trim()
+    if (params.monto !== undefined && params.monto !== "") {
+      const monto = Number(params.monto)
+      if (isNaN(monto) || monto <= 0) throw new Error("El monto debe ser mayor a 0")
+      updates.monto = monto
+    }
+    if (params.pagadopor !== undefined) updates.pagadopor = String(params.pagadopor).trim()
+
+    return updateRow("Gastos", id, updates)
+  })
+}
+
+function deleteGasto(params) {
+  return withLock(function () {
+    const id = (params.id || "").trim()
+    if (!id) throw new Error("Se requiere un ID")
+
+    const gasto = getGastos().filter(function (g) { return String(g.id) === id })[0]
+    if (!gasto) throw new Error("Gasto no encontrado")
+
+    assertNoEnPeriodoCerrado(gasto.fecha)
+
+    return deleteRowById("Gastos", id)
+  })
 }
