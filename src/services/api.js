@@ -125,6 +125,10 @@ export async function updateViaje(id, data) {
   return request("updateViaje", { method: "POST", body: { id, ...data } })
 }
 
+export async function deleteViaje(id) {
+  return request("deleteViaje", { method: "POST", body: { id } })
+}
+
 export async function saveParticipantes(viajeId, usuarioIds) {
   return request("setParticipantes", {
     method: "POST",
@@ -138,6 +142,10 @@ export async function createGasto(data) {
 
 export async function updateGasto(id, data) {
   return request("updateGasto", { method: "POST", body: { id, ...data } })
+}
+
+export async function deleteGasto(id) {
+  return request("deleteGasto", { method: "POST", body: { id } })
 }
 
 // miembros: [{ usuarioid, rol, dividegastos, recibebono, pagaestanque }]

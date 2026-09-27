@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react"
-import { createViaje, updateViaje, saveParticipantes } from "../services/api"
+import { createViaje, updateViaje, deleteViaje, saveParticipantes } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
 import { useViajeForm, EMPTY_VIAJE_FORM, validateViajeForm } from "../hooks/useViajeForm"
 import { usePendientesKm } from "../hooks/usePendientesKm"
+import { useEnPeriodoCerrado } from "../hooks/useEnPeriodoCerrado"
 import useFeedback from "../hooks/useFeedback"
 import { useData } from "../context/DataContext"
+import Modal from "../components/Modal"
 import ViajeFormModal from "../components/ViajeFormModal"
 import FinalizarViajeModal from "../components/FinalizarViajeModal"
 import EditButton from "../components/EditButton"
@@ -23,6 +25,7 @@ export default function ViajesPage() {
   } = useData()
   const autos = useMemo(() => autosRaw.filter((a) => a.activo !== false), [autosRaw])
   const usuarios = useMemo(() => usuariosRaw.filter((u) => u.activo !== false), [usuariosRaw])
+  const enPeriodoCerrado = useEnPeriodoCerrado()
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -33,6 +36,9 @@ export default function ViajesPage() {
   const [editError, setEditError] = useState("")
   const [pendientesOpen, setPendientesOpen] = useState(false)
   const [finalizarTarget, setFinalizarTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
   const autosById = useMemo(() => new Map(autos.map((a) => [a.id, a])), [autos])
   const usuariosById = useMemo(() => new Map(usuarios.map((u) => [u.id, u])), [usuarios])
@@ -198,6 +204,28 @@ export default function ViajesPage() {
     }
   }
 
+  function handleOpenDelete(viaje) {
+    setDeleteTarget(viaje)
+    setDeleteError("")
+  }
+
+  async function handleConfirmDelete() {
+    setDeleting(true)
+    setDeleteError("")
+    try {
+      await deleteViaje(deleteTarget.id)
+      setViajes((prev) => prev.filter((v) => v.id !== deleteTarget.id))
+      setParticipantes((prev) => prev.filter((p) => p.viajeid !== deleteTarget.id))
+      setDeleteTarget(null)
+      showSuccess("Viaje eliminado.")
+      reload()
+    } catch (err) {
+      setDeleteError(err.message || "No se pudo eliminar el viaje")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError("")
@@ -319,6 +347,7 @@ export default function ViajesPage() {
         <ul className="data-list">
           {viajesOrdenados.map((viaje, i) => {
             const nombres = viajeParticipantesNombres(viaje)
+            const bloqueado = enPeriodoCerrado(viaje.createdat)
             return (
               <li key={viaje.id ?? `viaje-${i}`}>
                 <div className="list-item-main">
@@ -333,12 +362,22 @@ export default function ViajesPage() {
                         type="button"
                         className="btn btn-primary btn-sm"
                         onClick={() => setFinalizarTarget(viaje)}
+                        disabled={bloqueado}
                       >
                         Finalizar
                       </button>
                     </>
                   )}
-                  <EditButton onClick={() => handleOpenEdit(viaje)} />
+                  <EditButton onClick={() => handleOpenEdit(viaje)} disabled={bloqueado} />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => handleOpenDelete(viaje)}
+                    disabled={bloqueado}
+                    title={bloqueado ? "Pertenece a un periodo cerrado" : undefined}
+                  >
+                    Eliminar
+                  </button>
                 </div>
                 <span className="list-item-sub">
                   {[
@@ -397,6 +436,25 @@ export default function ViajesPage() {
         onClose={() => setFinalizarTarget(null)}
         onFinalizar={handleFinalizar}
       />
+
+      <Modal title="Eliminar viaje" open={deleteTarget !== null} onClose={() => !deleting && setDeleteTarget(null)}>
+        <div className="form-card">
+          {deleteError && (
+            <p className="feedback-banner feedback-error" role="alert">{deleteError}</p>
+          )}
+          <p>
+            ¿Eliminar este viaje de {autoNombre(deleteTarget?.auto)}? Se borran también sus participantes. No se puede deshacer.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancelar
+            </button>
+            <button type="button" className="btn btn-primary" onClick={handleConfirmDelete} disabled={deleting}>
+              {deleting ? "…" : "Eliminar"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </section>
   )
 }

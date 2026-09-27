@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import { createGasto, updateGasto } from "../services/api"
+import { createGasto, updateGasto, deleteGasto } from "../services/api"
 import { useCurrentUserId } from "../hooks/useCurrentUser"
 import { useAutosVisibles } from "../hooks/useAutosVisibles"
+import { useEnPeriodoCerrado } from "../hooks/useEnPeriodoCerrado"
 import useFeedback from "../hooks/useFeedback"
 import { useData } from "../context/DataContext"
 import Modal from "../components/Modal"
@@ -80,6 +81,7 @@ export default function GastosPage() {
   } = useData()
   const autos = useMemo(() => autosRaw.filter((a) => a.activo !== false), [autosRaw])
   const usuarios = useMemo(() => usuariosRaw.filter((u) => u.activo !== false), [usuariosRaw])
+  const enPeriodoCerrado = useEnPeriodoCerrado()
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -91,6 +93,9 @@ export default function GastosPage() {
   const [editForm, setEditForm] = useState(emptyForm)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
   // Limpiar el ?nuevo=1 de la URL tras abrir el modal desde Home
   useEffect(() => {
@@ -199,6 +204,27 @@ export default function GastosPage() {
     setEditError("")
   }
 
+  function handleOpenDelete(gasto) {
+    setDeleteTarget(gasto)
+    setDeleteError("")
+  }
+
+  async function handleConfirmDelete() {
+    setDeleting(true)
+    setDeleteError("")
+    try {
+      await deleteGasto(deleteTarget.id)
+      setGastos((prev) => prev.filter((g) => g.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      showSuccess("Gasto eliminado.")
+      reload()
+    } catch (err) {
+      setDeleteError(err.message || "No se pudo eliminar el gasto")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
@@ -301,7 +327,16 @@ export default function GastosPage() {
                 {formatMonto(gasto.monto) && (
                   <span className="badge badge-active">{formatMonto(gasto.monto)}</span>
                 )}
-                <EditButton onClick={() => handleOpenEdit(gasto)} />
+                <EditButton onClick={() => handleOpenEdit(gasto)} disabled={enPeriodoCerrado(gasto.fecha)} />
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleOpenDelete(gasto)}
+                  disabled={enPeriodoCerrado(gasto.fecha)}
+                  title={enPeriodoCerrado(gasto.fecha) ? "Pertenece a un periodo cerrado" : undefined}
+                >
+                  Eliminar
+                </button>
               </div>
               <span className="list-item-sub">
                 {[
@@ -387,6 +422,27 @@ export default function GastosPage() {
             {editSaving ? "Guardando…" : "Guardar cambios"}
           </button>
         </form>
+      </Modal>
+
+      {/* Delete */}
+      <Modal title="Eliminar gasto" open={deleteTarget !== null} onClose={() => !deleting && setDeleteTarget(null)}>
+        <div className="form-card">
+          {deleteError && (
+            <p className="feedback-banner feedback-error" role="alert">{deleteError}</p>
+          )}
+          <p>
+            ¿Eliminar este gasto de {autoNombre(deleteTarget?.auto)}
+            {formatMonto(deleteTarget?.monto) ? ` por ${formatMonto(deleteTarget?.monto)}` : ""}? No se puede deshacer.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancelar
+            </button>
+            <button type="button" className="btn btn-primary" onClick={handleConfirmDelete} disabled={deleting}>
+              {deleting ? "…" : "Eliminar"}
+            </button>
+          </div>
+        </div>
       </Modal>
     </section>
   )
